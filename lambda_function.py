@@ -14,8 +14,8 @@ bedrock_agent_client = boto3.client(
 )
 
 # Your Knowledge Base ID — we'll add this next
-KNOWLEDGE_BASE_ID = "CP3AC5JPD4"
-MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+KNOWLEDGE_BASE_ID = "PPJG45JPD3"
+MODEL_ID = "us.anthropic.claude-haiku-4-5-2025001-v1:0"
 
 def query_knowledge_base(question: str) -> dict:
     try:
