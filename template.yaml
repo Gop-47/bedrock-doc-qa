@@ -1,1 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Bedrock RAG Document Q&A System'
 
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+  
+  KnowledgeBaseId:
+    Type: String
+    Description: Bedrock Knowledge Base ID
+
+Resources:
+
+  # S3 Bucket for documents
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'bedrock-doc-qa-${Environment}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'bedrock-qa-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda Function
+  QALambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'bedrock-doc-qa-${Environment}'
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          KNOWLEDGE_BASE_ID: !Ref KnowledgeBaseId
+          MODEL_ID: us.anthropic.claude-haiku-4-5-20251001-v1:0
+
+  # API Gateway
+  QARestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'bedrock-qa-api-${Environment}'
+      Description: RAG powered Document Q&A API
+
+  # API Resource /ask
+  AskResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref QARestApi
+      ParentId: !GetAtt QARestApi.RootResourceId
+      PathPart: ask
+
+  # POST Method
+  AskMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref QARestApi
+      ResourceId: !Ref AskResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - LambdaArn: !GetAtt QALambdaFunction.Arn
+
+  # Lambda permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref QALambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${QARestApi}/*'
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: AskMethod
+    Properties:
+      RestApiId: !Ref QARestApi
+      StageName: !Ref Environment
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${QARestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/ask'
+    Export:
+      Name: !Sub 'bedrock-qa-api-endpoint-${Environment}'
+
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref QALambdaFunction
+
+  DocumentsBucketName:
+    Description: S3 bucket for documents
+    Value: !Ref DocumentsBucket
