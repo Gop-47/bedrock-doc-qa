@@ -1,16 +1,13 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Noxora — AI Knowledge Assistant</title>
 
-    <meta
-        name="description"
-        content="Noxora is an AI knowledge assistant that answers questions from your documents."
-    >
+    <meta name="description" content="Noxora is an AI knowledge assistant that answers questions from your documents.">
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -93,11 +90,7 @@
 
                 <div class="input-wrapper">
 
-                    <textarea
-                        id="questionInput"
-                        placeholder="What would you like to know?"
-                        rows="3"
-                    ></textarea>
+                    <textarea id="questionInput" placeholder="What would you like to know?" rows="3"></textarea>
 
                     <div class="input-footer">
 
@@ -105,11 +98,7 @@
                             Press <kbd>Enter</kbd> to ask
                         </div>
 
-                        <button
-                            id="askButton"
-                            class="ask-button"
-                            type="button"
-                        >
+                        <button id="askButton" class="ask-button" type="button">
                             <span>Ask Noxora</span>
                             <span class="button-icon">↗</span>
                         </button>
@@ -148,10 +137,7 @@
 
 
             <!-- Loading -->
-            <section
-                id="loadingCard"
-                class="loading-card hidden"
-            >
+            <section id="loadingCard" class="loading-card hidden">
 
                 <div class="loading-spinner"></div>
 
@@ -169,10 +155,7 @@
 
 
             <!-- Answer -->
-            <section
-                id="answerSection"
-                class="answer-section hidden"
-            >
+            <section id="answerSection" class="answer-section hidden">
 
                 <div class="section-heading">
 
@@ -186,11 +169,7 @@
                         </div>
                     </div>
 
-                    <button
-                        id="copyButton"
-                        class="copy-button"
-                        type="button"
-                    >
+                    <button id="copyButton" class="copy-button" type="button">
                         Copy
                     </button>
 
@@ -199,15 +178,9 @@
 
                 <div class="answer-card">
 
-                    <div
-                        id="answerText"
-                        class="answer-text"
-                    ></div>
+                    <div id="answerText" class="answer-text"></div>
 
-                    <div
-                        id="cacheStatus"
-                        class="cache-status"
-                    ></div>
+                    <div id="cacheStatus" class="cache-status"></div>
 
                 </div>
 
@@ -215,10 +188,7 @@
 
 
             <!-- Sources -->
-            <section
-                id="sourcesSection"
-                class="sources-section hidden"
-            >
+            <section id="sourcesSection" class="sources-section hidden">
 
                 <div class="section-heading">
 
@@ -234,19 +204,13 @@
 
                 </div>
 
-                <div
-                    id="sourcesList"
-                    class="sources-list"
-                ></div>
+                <div id="sourcesList" class="sources-list"></div>
 
             </section>
 
 
             <!-- Error -->
-            <section
-                id="errorCard"
-                class="error-card hidden"
-            >
+            <section id="errorCard" class="error-card hidden">
 
                 <div class="error-icon">!</div>
 
@@ -255,10 +219,7 @@
                         Something went wrong
                     </div>
 
-                    <div
-                        id="errorMessage"
-                        class="error-message"
-                    ></div>
+                    <div id="errorMessage" class="error-message"></div>
                 </div>
 
             </section>
@@ -285,5 +246,5 @@
     <script src="script.js"></script>
 
 </body>
+
 </html>
-```
