@@ -35,3 +35,4 @@ jobs:
           aws lambda update-function-code \
             --function-name bedrock-doc-qa \
             --image-uri 917301404773.dkr.ecr.us-east-1.amazonaws.com/bedrock-doc-qa:${{ github.sha }}
+            
