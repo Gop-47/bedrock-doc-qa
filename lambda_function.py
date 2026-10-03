@@ -1,22 +1,26 @@
+import os
 import json
 import boto3
 from botocore.exceptions import ClientError
 
+from botocore.exceptions import ClientError
+
+# Configuration from environment variables
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
+MODEL_ID = os.environ["MODEL_ID"]
+
 # Initialize clients
 bedrock_client = boto3.client(
-    service_name='bedrock-runtime',
-    region_name='us-east-1'
+    service_name="bedrock-runtime",
+    region_name=AWS_REGION
 )
 
 bedrock_agent_client = boto3.client(
-    service_name='bedrock-agent-runtime',
-    region_name='us-east-1'
+    service_name="bedrock-agent-runtime",
+    region_name=AWS_REGION
 )
-
-# Your Knowledge Base ID — we'll add this next
-KNOWLEDGE_BASE_ID = "PPJG45JPD3"
-MODEL_ID = "us.anthropic.claude-haiku-4-5-2025001-v1:0"
-
+``
 def query_knowledge_base(question: str) -> dict:
     try:
         # First just RETRIEVE — no generation
