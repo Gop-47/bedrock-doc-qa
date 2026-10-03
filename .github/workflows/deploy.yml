@@ -1,1 +1,14 @@
+name: Deploy to AWS Lambda
 
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
