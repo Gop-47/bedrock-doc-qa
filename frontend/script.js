@@ -1,4 +1,3 @@
-```javascript
 // ==========================================
 // Noxora Configuration
 // ==========================================
@@ -92,7 +91,7 @@ async function askNoxora() {
         if (!response.ok) {
 
             throw new Error(
-                `API request failed with status ${response.status}`
+                "API request failed with status " + response.status
             );
         }
 
@@ -234,7 +233,7 @@ function displaySources(citations) {
         sourceName.className = "source-name";
 
         sourceName.textContent =
-            citation.source || `Document ${index + 1}`;
+            citation.source || `Document ${index + 1} `;
 
 
         const description = document.createElement("div");
@@ -356,4 +355,3 @@ function hideElement(element) {
     element.classList.add("hidden");
 
 }
-```
