@@ -11,7 +11,7 @@
 // Keep the /query at the end if your API Gateway route is:
 // POST /query
 
-const API_URL = "https://8wunnfzjyl.execute-api.us-east-1.amazonaws.com/dev/bedrock-doc-qa";
+const API_URL = "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
 
 
 // ==========================================
