@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import hashlib
 import boto3
 import redis
 
@@ -17,6 +18,9 @@ KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
 MODEL_ID = os.environ["MODEL_ID"]
 DYNAMODB_TABLE = os.environ["DYNAMODB_TABLE"]
 REDIS_ENDPOINT = os.environ["REDIS_ENDPOINT"]
+
+# Cache expiration: 1 hour
+CACHE_TTL = 3600
 
 
 # ==========================================
@@ -49,29 +53,57 @@ bedrock_agent_client = boto3.client(
 
 
 # ==========================================
-# Temporary Redis Connection Test
+# Redis - Cache Key
 # ==========================================
 
-def test_redis_connection():
+def get_cache_key(question: str) -> str:
+    normalized_question = question.strip().lower()
+
+    question_hash = hashlib.sha256(
+        normalized_question.encode("utf-8")
+    ).hexdigest()
+
+    return f"qa:{question_hash}"
+
+
+# ==========================================
+# Redis - Get Cached Answer
+# ==========================================
+
+def get_cached_answer(question: str):
     try:
-        redis_client.set(
-            "test_key",
-            "hello",
-            ex=60
-        )
+        cache_key = get_cache_key(question)
 
-        value = redis_client.get("test_key")
+        cached_data = redis_client.get(cache_key)
 
-        return {
-            "connected": True,
-            "value": value
-        }
+        if cached_data:
+            return json.loads(cached_data)
+
+        return None
 
     except Exception as e:
-        return {
-            "connected": False,
-            "error": str(e)
-        }
+        print(f"Redis GET error: {str(e)}")
+        return None
+
+
+# ==========================================
+# Redis - Save Answer
+# ==========================================
+
+def cache_answer(question: str, result: dict):
+    try:
+        cache_key = get_cache_key(question)
+
+        redis_client.set(
+            cache_key,
+            json.dumps(result),
+            ex=CACHE_TTL
+        )
+
+        print(f"Cached answer with key: {cache_key}")
+
+    except Exception as e:
+        print(f"Redis SET error: {str(e)}")
 
 
 # ==========================================
@@ -80,7 +112,25 @@ def test_redis_connection():
 
 def query_knowledge_base(question: str) -> dict:
     try:
-        # Retrieve relevant documents from Knowledge Base
+        # ==========================================
+        # Check Redis cache first
+        # ==========================================
+
+        cached_result = get_cached_answer(question)
+
+        if cached_result:
+            print("CACHE HIT")
+
+            cached_result["cache"] = "hit"
+
+            return cached_result
+
+        print("CACHE MISS")
+
+        # ==========================================
+        # Retrieve relevant documents
+        # ==========================================
+
         response = bedrock_agent_client.retrieve(
             knowledgeBaseId=KNOWLEDGE_BASE_ID,
             retrievalQuery={
@@ -88,10 +138,14 @@ def query_knowledge_base(question: str) -> dict:
             },
         )
 
+        # ==========================================
         # Extract retrieved chunks
+        # ==========================================
+
         contexts = []
 
         for result in response["retrievalResults"]:
+
             text = result["content"]["text"]
 
             source = (
@@ -105,12 +159,18 @@ def query_knowledge_base(question: str) -> dict:
                 "source": source
             })
 
-        # Build context string
+        # ==========================================
+        # Build context
+        # ==========================================
+
         context_text = "\n\n".join(
             [c["text"] for c in contexts]
         )
 
-        # Prompt Claude using retrieved context
+        # ==========================================
+        # Prompt Claude
+        # ==========================================
+
         prompt = f"""Use the following context from documents to answer the question.
 If the answer is not in the context say "I cannot find this in the provided documents."
 
@@ -133,7 +193,10 @@ Answer:"""
             ]
         }
 
+        # ==========================================
         # Call Claude
+        # ==========================================
+
         response_claude = bedrock_client.invoke_model(
             modelId=MODEL_ID,
             contentType="application/json",
@@ -147,18 +210,32 @@ Answer:"""
 
         answer = response_body["content"][0]["text"]
 
-        return {
+        result = {
             "answer": answer,
-            "citations": contexts
+            "citations": contexts,
+            "cache": "miss"
         }
 
+        # ==========================================
+        # Save result to Redis
+        # ==========================================
+
+        cache_answer(
+            question,
+            result
+        )
+
+        return result
+
     except ClientError as e:
+
         error_code = e.response["Error"]["Code"]
         error_message = str(e)
 
         return {
             "answer": f"Error: {error_code} - {error_message}",
-            "citations": []
+            "citations": [],
+            "cache": "error"
         }
 
 
@@ -167,10 +244,6 @@ Answer:"""
 # ==========================================
 
 def query_claude_directly(question: str) -> str:
-    """
-    Query Claude directly without using
-    the Knowledge Base.
-    """
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -185,6 +258,7 @@ def query_claude_directly(question: str) -> str:
     }
 
     try:
+
         response = bedrock_client.invoke_model(
             modelId=MODEL_ID,
             contentType="application/json",
@@ -199,6 +273,7 @@ def query_claude_directly(question: str) -> str:
         return response_body["content"][0]["text"]
 
     except ClientError as e:
+
         return f"Error calling Claude: {str(e)}"
 
 
@@ -206,7 +281,13 @@ def query_claude_directly(question: str) -> str:
 # DynamoDB - Save Query History
 # ==========================================
 
-def save_query_history(question, answer, mode, citations):
+def save_query_history(
+    question,
+    answer,
+    mode,
+    citations
+):
+
     history_table.put_item(
         Item={
             "query_id": str(uuid.uuid4()),
@@ -224,41 +305,13 @@ def save_query_history(question, answer, mode, citations):
 # ==========================================
 
 def lambda_handler(event, context):
-    """
-    Lambda entry point.
-
-    RAG mode:
-    {
-        "question": "...",
-        "mode": "rag"
-    }
-
-    Direct mode:
-    {
-        "question": "...",
-        "mode": "direct"
-    }
-
-    Default mode is RAG.
-    """
-
-    # ==========================================
-    # Temporary Redis connectivity test
-    # ==========================================
-
-    redis_test = test_redis_connection()
-
-    if not redis_test["connected"]:
-        return {
-            "statusCode": 500,
-            "body": json.dumps(redis_test)
-        }
 
     # ==========================================
     # Validate input
     # ==========================================
 
     if "question" not in event:
+
         return {
             "statusCode": 400,
             "body": json.dumps({
@@ -270,6 +323,7 @@ def lambda_handler(event, context):
     mode = event.get("mode", "rag")
 
     if not question.strip():
+
         return {
             "statusCode": 400,
             "body": json.dumps({
@@ -299,7 +353,7 @@ def lambda_handler(event, context):
                 "mode": "rag",
                 "answer": result["answer"],
                 "citations": result["citations"],
-                "redis_test": redis_test
+                "cache": result.get("cache", "unknown")
             }, indent=2)
         }
 
@@ -324,6 +378,6 @@ def lambda_handler(event, context):
                 "question": question,
                 "mode": "direct",
                 "answer": answer,
-                "redis_test": redis_test
+                "cache": "not_used"
             }, indent=2)
         }
