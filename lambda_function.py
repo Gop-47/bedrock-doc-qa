@@ -20,7 +20,7 @@ bedrock_agent_client = boto3.client(
     service_name="bedrock-agent-runtime",
     region_name=AWS_REGION
 )
-``
+
 def query_knowledge_base(question: str) -> dict:
     try:
         # First just RETRIEVE — no generation
