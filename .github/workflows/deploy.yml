@@ -22,17 +22,22 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::917301404773:role/github-actions-bedrock-doc-qa
           aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build Docker image
         run: |
           docker build --provenance=false \
             -t 917301404773.dkr.ecr.us-east-1.amazonaws.com/bedrock-doc-qa:${{ github.sha }} \
             .
+
       - name: Push Docker image to ECR
         run: |
           docker push 917301404773.dkr.ecr.us-east-1.amazonaws.com/bedrock-doc-qa:${{ github.sha }}
+
       - name: Deploy to Lambda
         run: |
           aws lambda update-function-code \
             --function-name bedrock-doc-qa \
             --image-uri 917301404773.dkr.ecr.us-east-1.amazonaws.com/bedrock-doc-qa:${{ github.sha }}
-            
