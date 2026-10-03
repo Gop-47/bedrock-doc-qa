@@ -309,6 +309,14 @@ def lambda_handler(event, context):
     # ==========================================
     # Validate input
     # ==========================================
+    if "body" in event:
+
+            body = event["body"]
+
+            if isinstance(body, str):
+                body = json.loads(body)
+
+            event = body
 
     if "question" not in event:
 
