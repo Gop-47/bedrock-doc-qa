@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import boto3
+import redis
 
 from datetime import datetime, timezone
 from botocore.exceptions import ClientError
@@ -15,6 +16,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
 MODEL_ID = os.environ["MODEL_ID"]
 DYNAMODB_TABLE = os.environ["DYNAMODB_TABLE"]
+REDIS_ENDPOINT = os.environ["REDIS_ENDPOINT"]
 
 
 # ==========================================
@@ -28,6 +30,13 @@ dynamodb = boto3.resource(
 
 history_table = dynamodb.Table(DYNAMODB_TABLE)
 
+redis_client = redis.Redis(
+    host=REDIS_ENDPOINT,
+    port=6379,
+    ssl=True,
+    decode_responses=True
+)
+
 bedrock_client = boto3.client(
     service_name="bedrock-runtime",
     region_name=AWS_REGION
@@ -37,6 +46,32 @@ bedrock_agent_client = boto3.client(
     service_name="bedrock-agent-runtime",
     region_name=AWS_REGION
 )
+
+
+# ==========================================
+# Temporary Redis Connection Test
+# ==========================================
+
+def test_redis_connection():
+    try:
+        redis_client.set(
+            "test_key",
+            "hello",
+            ex=60
+        )
+
+        value = redis_client.get("test_key")
+
+        return {
+            "connected": True,
+            "value": value
+        }
+
+    except Exception as e:
+        return {
+            "connected": False,
+            "error": str(e)
+        }
 
 
 # ==========================================
@@ -208,6 +243,18 @@ def lambda_handler(event, context):
     """
 
     # ==========================================
+    # Temporary Redis connectivity test
+    # ==========================================
+
+    redis_test = test_redis_connection()
+
+    if not redis_test["connected"]:
+        return {
+            "statusCode": 500,
+            "body": json.dumps(redis_test)
+        }
+
+    # ==========================================
     # Validate input
     # ==========================================
 
@@ -230,16 +277,14 @@ def lambda_handler(event, context):
             })
         }
 
-
     # ==========================================
-    # RAG Mode
+    # RAG mode
     # ==========================================
 
     if mode == "rag":
 
         result = query_knowledge_base(question)
 
-        # Save query to DynamoDB
         save_query_history(
             question=question,
             answer=result["answer"],
@@ -253,20 +298,19 @@ def lambda_handler(event, context):
                 "question": question,
                 "mode": "rag",
                 "answer": result["answer"],
-                "citations": result["citations"]
+                "citations": result["citations"],
+                "redis_test": redis_test
             }, indent=2)
         }
 
-
     # ==========================================
-    # Direct Mode
+    # Direct mode
     # ==========================================
 
     else:
 
         answer = query_claude_directly(question)
 
-        # Save query to DynamoDB
         save_query_history(
             question=question,
             answer=answer,
@@ -279,6 +323,7 @@ def lambda_handler(event, context):
             "body": json.dumps({
                 "question": question,
                 "mode": "direct",
-                "answer": answer
+                "answer": answer,
+                "redis_test": redis_test
             }, indent=2)
         }
