@@ -1,28 +1,51 @@
 const API_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
 
-const questionInput = document.getElementById("questionInput");
-const askButton = document.getElementById("askButton");
 
-const loadingCard = document.getElementById("loadingCard");
+/* =====================================================
+   ELEMENTS
+===================================================== */
 
-const answerSection = document.getElementById("answerSection");
-const answerText = document.getElementById("answerText");
-const cacheStatus = document.getElementById("cacheStatus");
+const questionInput =
+    document.getElementById("questionInput");
 
-const copyButton = document.getElementById("copyButton");
+const askButton =
+    document.getElementById("askButton");
 
-const sourcesSection = document.getElementById("sourcesSection");
-const sourcesList = document.getElementById("sourcesList");
-const sourcesCount = document.getElementById("sourcesCount");
+const loadingCard =
+    document.getElementById("loadingCard");
 
-const errorCard = document.getElementById("errorCard");
-const errorMessage = document.getElementById("errorMessage");
+const answerSection =
+    document.getElementById("answerSection");
+
+const answerText =
+    document.getElementById("answerText");
+
+const cacheStatus =
+    document.getElementById("cacheStatus");
+
+const copyButton =
+    document.getElementById("copyButton");
+
+const sourcesSection =
+    document.getElementById("sourcesSection");
+
+const sourcesList =
+    document.getElementById("sourcesList");
+
+const sourcesCount =
+    document.getElementById("sourcesCount");
+
+const errorCard =
+    document.getElementById("errorCard");
+
+const errorMessage =
+    document.getElementById("errorMessage");
 
 
-/* =========================
+/* =====================================================
    INITIAL STATE
-========================= */
+===================================================== */
 
 hideElement(loadingCard);
 hideElement(answerSection);
@@ -30,18 +53,25 @@ hideElement(sourcesSection);
 hideElement(errorCard);
 
 
-/* =========================
+/* =====================================================
    ASK QUESTION
-========================= */
+===================================================== */
 
 async function askQuestion() {
 
-    const question = questionInput.value.trim();
+    const question =
+        questionInput.value.trim();
+
 
     if (!question) {
-        showError("Please enter a question.");
+
+        showError(
+            "Please enter a question."
+        );
+
         return;
     }
+
 
     hideElement(errorCard);
     hideElement(answerSection);
@@ -49,23 +79,34 @@ async function askQuestion() {
 
     showElement(loadingCard);
 
+
     askButton.disabled = true;
-    askButton.textContent = "Thinking...";
+
+    askButton.textContent =
+        "Thinking...";
+
 
     try {
 
-        const response = await fetch(API_URL, {
-            method: "POST",
+        const response =
+            await fetch(API_URL, {
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+                method: "POST",
 
-            body: JSON.stringify({
-                question: question,
-                mode: "rag"
-            })
-        });
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+
+                    question: question,
+
+                    mode: "rag"
+
+                })
+
+            });
 
 
         if (!response.ok) {
@@ -78,16 +119,22 @@ async function askQuestion() {
         }
 
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
-        console.log("Noxora API response:", data);
+
+        console.log(
+            "Noxora API response:",
+            data
+        );
 
 
-        /* =========================
-           HANDLE LAMBDA PROXY BODY
-        ========================= */
+        /* =================================================
+           LAMBDA PROXY BODY
+        ================================================= */
 
         let result = data;
+
 
         if (data.body) {
 
@@ -106,15 +153,21 @@ async function askQuestion() {
                 );
 
             }
+
         }
 
 
         if (result.error) {
-            throw new Error(result.error);
+
+            throw new Error(
+                result.error
+            );
+
         }
 
 
         displayAnswer(result);
+
 
     } catch (error) {
 
@@ -123,82 +176,135 @@ async function askQuestion() {
             error
         );
 
+
         showError(
+
             error.message ||
             "Something went wrong. Please try again."
+
         );
+
 
     } finally {
 
         hideElement(loadingCard);
 
+
         askButton.disabled = false;
-        askButton.textContent = "Ask Noxora";
+
+        askButton.textContent =
+            "Ask Noxora";
 
     }
+
 }
 
 
-/* =========================
+/* =====================================================
    DISPLAY ANSWER
-========================= */
+===================================================== */
 
 function displayAnswer(data) {
 
-    answerText.textContent =
-        data.answer ||
-        "No answer returned.";
+    if (answerText) {
+
+        answerText.textContent =
+            data.answer ||
+            "No answer returned.";
+
+    }
+
 
     showElement(answerSection);
 
 
-    /* =========================
+    /* =================================================
        CACHE STATUS
-    ========================= */
+    ================================================= */
 
-    if (data.cache === "hit") {
+    if (cacheStatus) {
 
-        cacheStatus.textContent = "CACHE HIT";
+        if (data.cache === "hit") {
 
-        cacheStatus.className =
-            "cache-status cache-hit";
+            cacheStatus.textContent =
+                "CACHE HIT";
 
-    } else if (data.cache === "miss") {
+            cacheStatus.className =
+                "cache-status cache-hit";
 
-        cacheStatus.textContent = "CACHE MISS";
 
-        cacheStatus.className =
-            "cache-status cache-miss";
+        } else if (data.cache === "miss") {
 
-    } else {
+            cacheStatus.textContent =
+                "CACHE MISS";
 
-        cacheStatus.textContent = "";
+            cacheStatus.className =
+                "cache-status cache-miss";
 
-        cacheStatus.className =
-            "cache-status";
+
+        } else {
+
+            cacheStatus.textContent = "";
+
+            cacheStatus.className =
+                "cache-status";
+
+        }
 
     }
 
 
-    /* =========================
+    /* =================================================
        SOURCES
-    ========================= */
+    ================================================= */
 
     displaySources(
         data.citations || []
     );
+
 }
 
 
-/* =========================
+/* =====================================================
    DISPLAY SOURCES
-========================= */
+===================================================== */
 
 function displaySources(citations) {
 
+
+    /*
+     * Safety check.
+     *
+     * If the HTML does not contain sourcesList,
+     * don't crash the entire application.
+     */
+
+    if (!sourcesList) {
+
+        console.warn(
+            "sourcesList element not found."
+        );
+
+        return;
+
+    }
+
+
     sourcesList.innerHTML = "";
 
-    sourcesCount.textContent = "";
+
+    /*
+     * sourcesCount is optional.
+     *
+     * We don't assume it exists.
+     */
+
+    if (sourcesCount) {
+
+        sourcesCount.textContent =
+            "";
+
+    }
 
 
     if (
@@ -206,108 +312,135 @@ function displaySources(citations) {
         citations.length === 0
     ) {
 
-        hideElement(sourcesSection);
+        hideElement(
+            sourcesSection
+        );
 
         return;
 
     }
 
 
-    /*
-     * Remove duplicate documents.
-     *
-     * Bedrock can return multiple chunks
-     * from the same PDF. We only want to
-     * display each document once.
-     */
+    /* =================================================
+       REMOVE DUPLICATE DOCUMENTS
+    ================================================= */
 
     const uniqueSources = [];
 
-    const seenSources = new Set();
+    const seenSources =
+        new Set();
 
 
-    citations.forEach((citation) => {
+    citations.forEach(
+        (citation) => {
 
-        const source =
-            citation.source ||
-            "Unknown source";
-
-
-        let normalizedSource =
-            source.trim().toLowerCase();
+            const source =
+                citation.source ||
+                "Unknown source";
 
 
-        /*
-         * Remove query parameters from URLs
-         * so the same document is recognized
-         * as the same source.
-         */
+            let normalizedSource =
+                source
+                    .trim()
+                    .toLowerCase();
 
-        try {
 
-            const url =
-                new URL(source);
+            try {
 
-            normalizedSource =
-                (
-                    url.origin +
-                    url.pathname
-                ).toLowerCase();
+                const url =
+                    new URL(source);
 
-        } catch (error) {
 
-            // Keep normalized string
+                normalizedSource =
+                    (
+                        url.origin +
+                        url.pathname
+                    ).toLowerCase();
+
+
+            } catch (error) {
+
+                /*
+                 * If it isn't a valid URL,
+                 * use the normalized text.
+                 */
+
+            }
+
+
+            if (
+                !seenSources.has(
+                    normalizedSource
+                )
+            ) {
+
+                seenSources.add(
+                    normalizedSource
+                );
+
+
+                uniqueSources.push(
+                    citation
+                );
+
+            }
+
         }
+    );
 
 
-        if (
-            !seenSources.has(
-                normalizedSource
-            )
-        ) {
-
-            seenSources.add(
-                normalizedSource
-            );
-
-            uniqueSources.push(
-                citation
-            );
-
-        }
-
-    });
+    showElement(
+        sourcesSection
+    );
 
 
-    showElement(sourcesSection);
+    /* =================================================
+       SOURCE COUNT
+    ================================================= */
+
+    if (sourcesCount) {
+
+        sourcesCount.textContent =
+
+            uniqueSources.length === 1
+
+                ? "1 source"
+
+                : uniqueSources.length +
+                  " sources";
+
+    }
 
 
-    sourcesCount.textContent =
-        uniqueSources.length === 1
-            ? "1 source"
-            : uniqueSources.length + " sources";
-
-
-    /* =========================
+    /* =================================================
        CREATE SOURCE CARDS
-    ========================= */
+    ================================================= */
 
     uniqueSources.forEach(
         (citation, index) => {
 
+
+            /* ================================
+               CARD
+            ================================= */
+
             const sourceCard =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             sourceCard.className =
                 "source-card";
 
 
-            /* =========================
+            /* ================================
                ICON
-            ========================= */
+            ================================= */
 
             const icon =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             icon.className =
                 "source-icon";
@@ -316,23 +449,27 @@ function displaySources(citations) {
                 "📄";
 
 
-            /* =========================
+            /* ================================
                CONTENT
-            ========================= */
+            ================================= */
 
             const content =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             content.className =
                 "source-content";
 
 
-            /* =========================
+            /* ================================
                LABEL
-            ========================= */
+            ================================= */
 
             const label =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             label.className =
                 "source-label";
@@ -342,12 +479,14 @@ function displaySources(citations) {
                 (index + 1);
 
 
-            /* =========================
+            /* ================================
                FILE NAME
-            ========================= */
+            ================================= */
 
             const name =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             name.className =
                 "source-name";
@@ -365,18 +504,23 @@ function displaySources(citations) {
             try {
 
                 const url =
-                    new URL(sourceUrl);
+                    new URL(
+                        sourceUrl
+                    );
+
 
                 const pathname =
                     decodeURIComponent(
                         url.pathname
                     );
 
+
                 fileName =
                     pathname
                         .split("/")
                         .pop() ||
                     sourceUrl;
+
 
             } catch (error) {
 
@@ -389,16 +533,19 @@ function displaySources(citations) {
             name.textContent =
                 fileName;
 
+
             name.title =
                 sourceUrl;
 
 
-            /* =========================
+            /* ================================
                DESCRIPTION
-            ========================= */
+            ================================= */
 
             const description =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             description.className =
                 "source-description";
@@ -407,12 +554,14 @@ function displaySources(citations) {
                 "Retrieved from your Knowledge Base";
 
 
-            /* =========================
+            /* ================================
                SOURCE TEXT
-            ========================= */
+            ================================= */
 
             const sourceText =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             sourceText.className =
                 "source-text hidden";
@@ -422,12 +571,14 @@ function displaySources(citations) {
                 "No source text available.";
 
 
-            /* =========================
-               EXPAND BUTTON
-            ========================= */
+            /* ================================
+               VIEW BUTTON
+            ================================= */
 
             const expandButton =
-                document.createElement("button");
+                document.createElement(
+                    "button"
+                );
 
             expandButton.className =
                 "source-expand";
@@ -443,13 +594,13 @@ function displaySources(citations) {
                 "click",
                 () => {
 
-                    const hidden =
+                    const isHidden =
                         sourceText.classList.contains(
                             "hidden"
                         );
 
 
-                    if (hidden) {
+                    if (isHidden) {
 
                         sourceText.classList.remove(
                             "hidden"
@@ -473,9 +624,9 @@ function displaySources(citations) {
             );
 
 
-            /* =========================
-               BUILD
-            ========================= */
+            /* ================================
+               BUILD CARD
+            ================================= */
 
             content.appendChild(
                 label
@@ -517,89 +668,116 @@ function displaySources(citations) {
 }
 
 
-/* =========================
+/* =====================================================
    COPY ANSWER
-========================= */
+===================================================== */
 
-copyButton.addEventListener(
-    "click",
-    async () => {
+if (copyButton) {
 
-        try {
+    copyButton.addEventListener(
+        "click",
+        async () => {
 
-            await navigator.clipboard.writeText(
-                answerText.textContent
-            );
+            try {
 
-
-            const originalText =
-                copyButton.textContent;
+                await navigator.clipboard.writeText(
+                    answerText.textContent
+                );
 
 
-            copyButton.textContent =
-                "Copied!";
+                const originalText =
+                    copyButton.textContent;
 
-
-            setTimeout(() => {
 
                 copyButton.textContent =
-                    originalText;
-
-            }, 1500);
-
-        } catch (error) {
-
-            console.error(
-                "Copy failed:",
-                error
-            );
-
-        }
-
-    }
-);
+                    "Copied!";
 
 
-/* =========================
-   ENTER KEY
-========================= */
+                setTimeout(
+                    () => {
 
-questionInput.addEventListener(
-    "keydown",
-    (event) => {
+                        copyButton.textContent =
+                            originalText;
 
-        if (
-            event.key === "Enter" &&
-            !event.shiftKey
-        ) {
+                    },
+                    1500
+                );
 
-            event.preventDefault();
 
-            askQuestion();
+            } catch (error) {
+
+                console.error(
+                    "Copy failed:",
+                    error
+                );
+
+            }
 
         }
-
-    }
-);
-
-
-/* =========================
-   ERROR
-========================= */
-
-function showError(message) {
-
-    errorMessage.textContent =
-        message;
-
-    showElement(errorCard);
+    );
 
 }
 
 
-/* =========================
+/* =====================================================
+   ENTER KEY
+===================================================== */
+
+if (questionInput) {
+
+    questionInput.addEventListener(
+        "keydown",
+        (event) => {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                askQuestion();
+
+            }
+
+        }
+    );
+
+}
+
+
+/* =====================================================
+   ERROR
+===================================================== */
+
+function showError(message) {
+
+    if (!errorMessage) {
+
+        console.error(
+            "Error:",
+            message
+        );
+
+        return;
+
+    }
+
+
+    errorMessage.textContent =
+        message;
+
+
+    showElement(
+        errorCard
+    );
+
+}
+
+
+/* =====================================================
    HELPERS
-========================= */
+===================================================== */
 
 function showElement(element) {
 
