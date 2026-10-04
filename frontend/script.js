@@ -1,140 +1,203 @@
 // ============================================================
-// Noxora AI Knowledge Assistant - Frontend
+// CONFIGURATION
 // ============================================================
 
 const API_BASE_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE =
+    10 * 1024 * 1024; // 10 MB
+
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+
+const historyCount =
+    document.getElementById("historyCount");
+
+const historyList =
+    document.getElementById("historyList");
+
+const modeToggle =
+    document.getElementById("modeToggle");
+
+const modeOptions =
+    document.querySelectorAll(".mode-option");
+
+const questionForm =
+    document.getElementById("questionForm");
+
+const questionBox =
+    document.getElementById("questionBox");
+
+const questionInput =
+    document.getElementById("questionInput");
+
+const askButton =
+    document.getElementById("askButton");
+
+const askButtonText =
+    document.getElementById("askButtonText");
+
+const askButtonIcon =
+    document.getElementById("askButtonIcon");
+
+const inputError =
+    document.getElementById("inputError");
+
+const inputErrorTitle =
+    document.getElementById("inputErrorTitle");
+
+const inputErrorMessage =
+    document.getElementById("inputErrorMessage");
+
+const uploadPanel =
+    document.getElementById("uploadPanel");
+
+const pdfInput =
+    document.getElementById("pdfInput");
+
+const uploadButton =
+    document.getElementById("uploadButton");
+
+const uploadButtonIcon =
+    document.getElementById("uploadButtonIcon");
+
+const uploadButtonText =
+    document.getElementById("uploadButtonText");
+
+const uploadStatus =
+    document.getElementById("uploadStatus");
+
+const uploadStatusIcon =
+    document.getElementById("uploadStatusIcon");
+
+const uploadStatusTitle =
+    document.getElementById("uploadStatusTitle");
+
+const uploadStatusMessage =
+    document.getElementById("uploadStatusMessage");
+
+const uploadProgressBar =
+    document.getElementById("uploadProgressBar");
+
+const answerSection =
+    document.getElementById("answerSection");
+
+const answerModeBadge =
+    document.getElementById("answerModeBadge");
+
+const cacheBadge =
+    document.getElementById("cacheBadge");
+
+const answerContent =
+    document.getElementById("answerContent");
+
+const sourcesSection =
+    document.getElementById("sourcesSection");
+
+const sourcesList =
+    document.getElementById("sourcesList");
+
+
+// ============================================================
+// APPLICATION STATE
+// ============================================================
 
 let currentMode = "rag";
-let currentIngestionJobId = null;
-let ingestionInProgress = false;
 
+let historyData = [];
 
-// ============================================================
-// DOM HELPER
-// ============================================================
-
-function $(id) {
-    return document.getElementById(id);
-}
+let uploadInProgress = false;
 
 
 // ============================================================
 // INITIALIZATION
 // ============================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    console.log(
-        "Initializing Noxora AI Knowledge Assistant"
-    );
+        initializeMode();
 
-    setupModeToggle();
-    setupQuestionForm();
-    setupUpload();
-    setupTextareaBehavior();
+        initializeQuestionForm();
 
-    loadHistory();
+        initializeUpload();
 
-});
+        loadHistory();
+
+    }
+);
 
 
 // ============================================================
-// MODE TOGGLE
+// MODE
 // ============================================================
 
-function setupModeToggle() {
+function initializeMode() {
 
-    const modeToggle = $("modeToggle");
-
-    if (!modeToggle) {
-        console.warn("modeToggle not found");
+    if (!modeOptions || modeOptions.length === 0) {
         return;
     }
 
-    const modeButtons =
-        modeToggle.querySelectorAll(
-            ".mode-option"
-        );
+    modeOptions.forEach(
+        (button) => {
 
-    modeButtons.forEach(button => {
+            button.addEventListener(
+                "click",
+                () => {
 
-        button.addEventListener(
-            "click",
-            () => {
+                    const mode =
+                        button.dataset.mode;
 
-                const mode =
-                    button.dataset.mode;
-
-                if (
-                    mode !== "rag" &&
-                    mode !== "direct"
-                ) {
-                    return;
-                }
-
-                currentMode = mode;
-
-                modeButtons.forEach(
-                    otherButton => {
-
-                        const active =
-                            otherButton.dataset.mode ===
-                            currentMode;
-
-                        otherButton.classList.toggle(
-                            "active",
-                            active
-                        );
-
-                        otherButton.setAttribute(
-                            "aria-pressed",
-                            active
-                                ? "true"
-                                : "false"
-                        );
-
+                    if (
+                        mode !== "rag" &&
+                        mode !== "direct"
+                    ) {
+                        return;
                     }
-                );
 
-                updateModeUI();
+                    currentMode = mode;
 
-            }
-        );
+                    updateModeUI();
 
-    });
+                }
+            );
+
+        }
+    );
 
     updateModeUI();
 }
 
 
-// ============================================================
-// UPDATE MODE UI
-// ============================================================
-
 function updateModeUI() {
 
-    const questionInput =
-        $("questionInput");
+    modeOptions.forEach(
+        (button) => {
 
-    if (!questionInput) {
-        return;
-    }
+            const mode =
+                button.dataset.mode;
 
-    if (currentMode === "direct") {
+            const isActive =
+                mode === currentMode;
 
-        questionInput.placeholder =
-            "Ask Claude anything...";
+            button.classList.toggle(
+                "active",
+                isActive
+            );
 
-    } else {
+            button.setAttribute(
+                "aria-selected",
+                isActive
+                    ? "true"
+                    : "false"
+            );
 
-        questionInput.placeholder =
-            "Ask a question about your documents...";
-
-    }
-
+        }
+    );
 }
 
 
@@ -142,22 +205,15 @@ function updateModeUI() {
 // QUESTION FORM
 // ============================================================
 
-function setupQuestionForm() {
+function initializeQuestionForm() {
 
-    const form =
-        $("questionForm");
-
-    if (!form) {
-        console.warn(
-            "questionForm not found"
-        );
-
+    if (!questionForm) {
         return;
     }
 
-    form.addEventListener(
+    questionForm.addEventListener(
         "submit",
-        async event => {
+        async (event) => {
 
             event.preventDefault();
 
@@ -166,45 +222,31 @@ function setupQuestionForm() {
         }
     );
 
-}
 
+    // Enter = submit
+    // Shift + Enter = new line
 
-// ============================================================
-// TEXTAREA BEHAVIOR
-// ============================================================
+    if (questionInput) {
 
-function setupTextareaBehavior() {
+        questionInput.addEventListener(
+            "keydown",
+            (event) => {
 
-    const textarea =
-        $("questionInput");
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
 
-    if (!textarea) {
-        return;
-    }
+                    event.preventDefault();
 
-    textarea.addEventListener(
-        "keydown",
-        event => {
+                    questionForm.requestSubmit();
 
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey
-            ) {
-
-                event.preventDefault();
-
-                const form =
-                    $("questionForm");
-
-                if (form) {
-                    form.requestSubmit();
                 }
 
             }
+        );
 
-        }
-    );
-
+    }
 }
 
 
@@ -214,70 +256,115 @@ function setupTextareaBehavior() {
 
 async function askQuestion() {
 
-    const questionInput =
-        $("questionInput");
-
-    if (!questionInput) {
-
-        console.error(
-            "questionInput not found"
-        );
-
-        return;
-    }
-
     const question =
-        questionInput.value.trim();
+        questionInput
+            ? questionInput.value.trim()
+            : "";
+
+    clearInputError();
 
     if (!question) {
 
         showInputError(
             "Question required",
-            "Please enter a question before asking Noxora."
+            "Please enter a question before asking."
         );
 
-        questionInput.focus();
+        if (questionInput) {
+            questionInput.focus();
+        }
 
         return;
     }
 
-    clearInputError();
 
-    setQuestionLoading(true);
+    setAskButtonLoading(true);
+
 
     try {
 
-        const result =
-            await apiRequest(
-                "/query",
+        console.log(
+            "Sending question:",
+            question
+        );
+
+        console.log(
+            "Mode:",
+            currentMode
+        );
+
+
+        const apiResponse =
+            await fetch(
+                `${API_BASE_URL}/query`,
                 {
                     method: "POST",
 
-                    body: {
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
                         question: question,
                         mode: currentMode
-                    }
+                    })
                 }
             );
 
+
+        const result =
+            await parseApiResponse(
+                apiResponse
+            );
+
+
         console.log(
-            "Question result:",
+            "Query result:",
             result
         );
 
-        if (!result.success) {
+
+        if (
+            !apiResponse.ok ||
+            !result.success
+        ) {
 
             throw new Error(
                 result.error ||
                 result.message ||
-                "Unable to get an answer."
+                `Request failed (${apiResponse.status})`
             );
 
         }
 
-        renderAnswer(result);
+
+        // Display answer
+
+        showAnswer({
+            question:
+                result.question || question,
+
+            answer:
+                result.answer || "",
+
+            mode:
+                result.mode || currentMode,
+
+            cached:
+                result.cached === true,
+
+            sources:
+                Array.isArray(result.sources)
+                    ? result.sources
+                    : []
+        });
+
+
+        // Refresh history
 
         await loadHistory();
+
 
     } catch (error) {
 
@@ -286,51 +373,52 @@ async function askQuestion() {
             error
         );
 
+
         showInputError(
-            "Unable to answer",
+            "Question failed",
             error.message ||
-            "Unable to process your question."
+                "Unable to get an answer."
         );
+
 
     } finally {
 
-        setQuestionLoading(false);
+        setAskButtonLoading(false);
 
     }
-
 }
 
 
 // ============================================================
-// RENDER ANSWER
+// SHOW ANSWER
 // ============================================================
 
-function renderAnswer(result) {
+function showAnswer(item) {
 
-    const answerSection =
-        $("answerSection");
-
-    const answerContent =
-        $("answerContent");
-
-    if (!answerSection || !answerContent) {
-
-        console.error(
-            "Answer UI elements not found."
-        );
-
+    if (!answerSection) {
         return;
     }
 
-    // --------------------------------------------------------
-    // Answer
-    // --------------------------------------------------------
 
-    answerContent.innerHTML =
-        formatAnswer(
-            result.answer ||
-            "No answer returned."
-        );
+    const answer =
+        item.answer ||
+        "No answer available.";
+
+
+    const mode =
+        item.mode ||
+        "rag";
+
+
+    const cached =
+        item.cached === true;
+
+
+    const sources =
+        Array.isArray(item.sources)
+            ? item.sources
+            : [];
+
 
     // --------------------------------------------------------
     // Show answer section
@@ -340,292 +428,71 @@ function renderAnswer(result) {
         "hidden"
     );
 
+
+    // Some designs may use display:none
+    // instead of hidden class.
+
+    answerSection.style.display = "";
+
+
+    // --------------------------------------------------------
+    // Answer
+    // --------------------------------------------------------
+
+    if (answerContent) {
+
+        answerContent.innerHTML =
+            formatAnswer(answer);
+
+    }
+
+
     // --------------------------------------------------------
     // Mode badge
     // --------------------------------------------------------
 
-    const answerModeBadge =
-        $("answerModeBadge");
-
     if (answerModeBadge) {
 
-        if (result.mode === "direct") {
+        answerModeBadge.textContent =
+            mode.toUpperCase();
 
-            answerModeBadge.textContent =
-                "DIRECT AI";
-
-        } else {
-
-            answerModeBadge.textContent =
-                "KNOWLEDGE BASE";
-
-        }
+        answerModeBadge.style.display =
+            "inline-flex";
 
     }
+
 
     // --------------------------------------------------------
     // Cache badge
     // --------------------------------------------------------
 
-    const cacheBadge =
-        $("cacheBadge");
-
     if (cacheBadge) {
 
-        cacheBadge.classList.toggle(
-            "hidden",
-            !result.cached
-        );
+        if (cached) {
+
+            cacheBadge.textContent =
+                "Cached";
+
+            cacheBadge.style.display =
+                "inline-flex";
+
+        } else {
+
+            cacheBadge.style.display =
+                "none";
+
+        }
 
     }
+
 
     // --------------------------------------------------------
     // Sources
     // --------------------------------------------------------
 
     renderSources(
-        Array.isArray(result.sources)
-            ? result.sources
-            : []
+        sources
     );
-
-    // Scroll answer into view
-    answerSection.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-    });
-
-}
-
-
-// ============================================================
-// FORMAT ANSWER
-// ============================================================
-
-function formatAnswer(text) {
-
-    if (!text) {
-        return "";
-    }
-
-    return escapeHtml(text)
-        .replace(/\n\n/g, "<br><br>")
-        .replace(/\n/g, "<br>");
-
-}
-
-
-// ============================================================
-// RENDER SOURCES
-// ============================================================
-
-function renderSources(sources) {
-
-    const sourcesSection =
-        $("sourcesSection");
-
-    const sourcesList =
-        $("sourcesList");
-
-    if (!sourcesSection || !sourcesList) {
-
-        console.warn(
-            "Sources UI elements not found."
-        );
-
-        return;
-    }
-
-    sourcesList.innerHTML = "";
-
-    if (!sources.length) {
-
-        sourcesSection.classList.add(
-            "hidden"
-        );
-
-        return;
-    }
-
-    sourcesSection.classList.remove(
-        "hidden"
-    );
-
-    sources.forEach(
-        (source, index) => {
-
-            const sourceCard =
-                document.createElement("div");
-
-            sourceCard.className =
-                "source-card";
-
-            // ------------------------------------------------
-            // Source URI
-            // ------------------------------------------------
-
-            const sourceUri =
-                source.source ||
-                source.uri ||
-                "";
-
-            // ------------------------------------------------
-            // Source name
-            // ------------------------------------------------
-
-            const sourceName =
-                getFilenameFromUri(
-                    sourceUri
-                ) ||
-                `Source ${index + 1}`;
-
-            // ------------------------------------------------
-            // Source score
-            // ------------------------------------------------
-
-            const score =
-                source.score !== undefined &&
-                source.score !== null
-                    ? Number(source.score)
-                    : null;
-
-            // ------------------------------------------------
-            // Title
-            // ------------------------------------------------
-
-            const title =
-                document.createElement(
-                    "div"
-                );
-
-            title.className =
-                "source-title";
-
-            title.textContent =
-                sourceName;
-
-            sourceCard.appendChild(
-                title
-            );
-
-            // ------------------------------------------------
-            // Score
-            // ------------------------------------------------
-
-            if (
-                score !== null &&
-                !Number.isNaN(score)
-            ) {
-
-                const scoreElement =
-                    document.createElement(
-                        "div"
-                    );
-
-                scoreElement.className =
-                    "source-score";
-
-                scoreElement.textContent =
-                    `Relevance: ${(score * 100).toFixed(1)}%`;
-
-                sourceCard.appendChild(
-                    scoreElement
-                );
-
-            }
-
-            // ------------------------------------------------
-            // Preview
-            // ------------------------------------------------
-
-            const preview =
-                source.text || "";
-
-            if (preview) {
-
-                const previewElement =
-                    document.createElement(
-                        "div"
-                    );
-
-                previewElement.className =
-                    "source-preview";
-
-                previewElement.textContent =
-                    preview.length > 500
-                        ? preview.substring(
-                            0,
-                            500
-                        ) + "..."
-                        : preview;
-
-                sourceCard.appendChild(
-                    previewElement
-                );
-
-            }
-
-            // ------------------------------------------------
-            // URI
-            // ------------------------------------------------
-
-            if (sourceUri) {
-
-                const uriElement =
-                    document.createElement(
-                        "div"
-                    );
-
-                uriElement.className =
-                    "source-uri";
-
-                uriElement.textContent =
-                    sourceUri;
-
-                sourceCard.appendChild(
-                    uriElement
-                );
-
-            }
-
-            sourcesList.appendChild(
-                sourceCard
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// GET FILENAME
-// ============================================================
-
-function getFilenameFromUri(uri) {
-
-    if (!uri) {
-        return "";
-    }
-
-    try {
-
-        const cleaned =
-            uri.split("?")[0];
-
-        const parts =
-            cleaned.split("/");
-
-        return (
-            parts[parts.length - 1] ||
-            ""
-        );
-
-    } catch {
-
-        return "";
-
-    }
 
 }
 
@@ -638,44 +505,73 @@ async function loadHistory() {
 
     try {
 
-        const result =
-            await apiRequest(
-                "/query/history"
+        console.log(
+            "Loading history..."
+        );
+
+
+        const apiResponse =
+            await fetch(
+                `${API_BASE_URL}/query/history`,
+                {
+                    method: "GET"
+                }
             );
+
+
+        const result =
+            await parseApiResponse(
+                apiResponse
+            );
+
 
         console.log(
             "History result:",
             result
         );
 
-        if (!result.success) {
+
+        if (
+            !apiResponse.ok ||
+            !result.success
+        ) {
 
             throw new Error(
                 result.error ||
                 result.message ||
-                "Unable to load history."
+                `History request failed (${apiResponse.status})`
             );
 
         }
 
-        const items =
-            Array.isArray(
-                result.history
-            )
+
+        historyData =
+            Array.isArray(result.history)
                 ? result.history
                 : [];
 
-        renderHistory(items);
+
+        renderHistory(
+            historyData
+        );
+
 
     } catch (error) {
 
         console.error(
-            "History loading error:",
+            "History error:",
             error
         );
 
-    }
 
+        historyData = [];
+
+        renderHistory(
+            historyData,
+            true
+        );
+
+    }
 }
 
 
@@ -683,150 +579,127 @@ async function loadHistory() {
 // RENDER HISTORY
 // ============================================================
 
-function renderHistory(items) {
-
-    const historyList =
-        $("historyList");
+function renderHistory(
+    history,
+    hasError = false
+) {
 
     if (!historyList) {
+        return;
+    }
 
-        console.warn(
-            "historyList not found"
-        );
+
+    historyList.innerHTML = "";
+
+
+    // --------------------------------------------------------
+    // History error
+    // --------------------------------------------------------
+
+    if (hasError) {
+
+        historyList.innerHTML = `
+            <div class="history-empty">
+                Unable to load history
+            </div>
+        `;
+
+        if (historyCount) {
+            historyCount.textContent = "0";
+        }
 
         return;
     }
 
-    historyList.innerHTML = "";
 
-    const historyCount =
-        $("historyCount");
+    // --------------------------------------------------------
+    // No history
+    // --------------------------------------------------------
+
+    if (
+        !history ||
+        history.length === 0
+    ) {
+
+        historyList.innerHTML = `
+            <div class="history-empty">
+                No questions yet
+            </div>
+        `;
+
+        if (historyCount) {
+            historyCount.textContent = "0";
+        }
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Count
+    // --------------------------------------------------------
 
     if (historyCount) {
 
         historyCount.textContent =
-            String(items.length);
+            history.length.toString();
 
     }
 
-    if (!items.length) {
 
-        const empty =
-            document.createElement(
-                "div"
-            );
+    // --------------------------------------------------------
+    // Render questions ONLY
+    // --------------------------------------------------------
 
-        empty.className =
-            "history-empty";
+    history.forEach(
+        (item, index) => {
 
-        empty.innerHTML = `
-            <div class="history-empty-icon">
-                ◌
-            </div>
+            if (!item) {
+                return;
+            }
 
-            <span>
-                No queries yet
-            </span>
-        `;
 
-        historyList.appendChild(
-            empty
-        );
+            const question =
+                item.question ||
+                "Untitled question";
 
-        return;
-    }
-
-    items.forEach(
-        item => {
 
             const historyItem =
                 document.createElement(
-                    "div"
+                    "button"
                 );
+
+
+            historyItem.type =
+                "button";
+
 
             historyItem.className =
                 "history-item";
 
-            // ------------------------------------------------
-            // Question
-            // ------------------------------------------------
 
-            const question =
-                document.createElement(
-                    "div"
-                );
+            historyItem.title =
+                question;
 
-            question.className =
-                "history-question";
 
-            question.textContent =
-                item.question ||
-                "Unknown question";
+            historyItem.innerHTML = `
+                <span class="history-question">
+                    ${escapeHtml(question)}
+                </span>
+            `;
 
-            // ------------------------------------------------
-            // Answer
-            // ------------------------------------------------
 
-            const answer =
-                document.createElement(
-                    "div"
-                );
+            historyItem.addEventListener(
+                "click",
+                () => {
 
-            answer.className =
-                "history-answer";
+                    showHistoryAnswer(
+                        item
+                    );
 
-            const answerText =
-                item.answer || "";
-
-            answer.textContent =
-                answerText.length > 300
-                    ? answerText.substring(
-                        0,
-                        300
-                    ) + "..."
-                    : answerText;
-
-            // ------------------------------------------------
-            // Metadata
-            // ------------------------------------------------
-
-            const metadata =
-                document.createElement(
-                    "div"
-                );
-
-            metadata.className =
-                "history-meta";
-
-            const mode =
-                item.mode ||
-                "rag";
-
-            const timestamp =
-                item.timestamp
-                    ? formatDate(
-                        item.timestamp
-                    )
-                    : "";
-
-            metadata.textContent =
-                `${mode.toUpperCase()}${
-                    timestamp
-                        ? " • " + timestamp
-                        : ""
-                }`;
-
-            historyItem.appendChild(
-                question
+                }
             );
 
-            historyItem.appendChild(
-                answer
-            );
-
-            historyItem.appendChild(
-                metadata
-            );
 
             historyList.appendChild(
                 historyItem
@@ -839,51 +712,129 @@ function renderHistory(items) {
 
 
 // ============================================================
-// UPLOAD SETUP
+// SHOW HISTORY ANSWER
 // ============================================================
 
-function setupUpload() {
+function showHistoryAnswer(item) {
 
-    const pdfInput =
-        $("pdfInput");
+    if (!item) {
+        return;
+    }
 
-    const uploadButton =
-        $("uploadButton");
 
-    if (!pdfInput) {
+    console.log(
+        "Opening history item:",
+        item
+    );
 
-        console.error(
-            "pdfInput not found"
+
+    // --------------------------------------------------------
+    // Restore mode
+    // --------------------------------------------------------
+
+    if (
+        item.mode === "rag" ||
+        item.mode === "direct"
+    ) {
+
+        currentMode =
+            item.mode;
+
+        updateModeUI();
+
+    }
+
+
+    // --------------------------------------------------------
+    // Show answer
+    // --------------------------------------------------------
+
+    showAnswer({
+
+        question:
+            item.question || "",
+
+        answer:
+            item.answer || "",
+
+        mode:
+            item.mode || "rag",
+
+        cached:
+            item.cached === true,
+
+        sources:
+            Array.isArray(item.sources)
+                ? item.sources
+                : []
+
+    });
+
+
+    // --------------------------------------------------------
+    // Put question into input
+    // --------------------------------------------------------
+
+    if (questionInput) {
+
+        questionInput.value =
+            item.question || "";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Remove input error
+    // --------------------------------------------------------
+
+    clearInputError();
+
+
+    // --------------------------------------------------------
+    // Scroll to answer
+    // --------------------------------------------------------
+
+    if (answerSection) {
+
+        setTimeout(
+            () => {
+
+                answerSection.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start"
+                });
+
+            },
+            50
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// UPLOAD INITIALIZATION
+// ============================================================
+
+function initializeUpload() {
+
+    if (!uploadButton || !pdfInput) {
+        console.warn(
+            "Upload elements not found."
         );
 
         return;
     }
 
-    if (!uploadButton) {
 
-        console.error(
-            "uploadButton not found"
-        );
-
-        return;
-    }
-
-    // --------------------------------------------------------
-    // Choose PDF button
-    // --------------------------------------------------------
+    // Clicking upload button opens file picker
 
     uploadButton.addEventListener(
         "click",
         () => {
 
-            if (ingestionInProgress) {
-
-                setUploadStatus(
-                    "warning",
-                    "Please wait",
-                    "A document is already being synchronized."
-                );
-
+            if (uploadInProgress) {
                 return;
             }
 
@@ -892,9 +843,8 @@ function setupUpload() {
         }
     );
 
-    // --------------------------------------------------------
+
     // File selected
-    // --------------------------------------------------------
 
     pdfInput.addEventListener(
         "change",
@@ -904,11 +854,15 @@ function setupUpload() {
                 pdfInput.files &&
                 pdfInput.files[0];
 
+
             if (!file) {
                 return;
             }
 
-            await uploadPdf(file);
+
+            await uploadPdf(
+                file
+            );
 
         }
     );
@@ -922,134 +876,199 @@ function setupUpload() {
 
 async function uploadPdf(file) {
 
-    if (ingestionInProgress) {
-
-        setUploadStatus(
-            "warning",
-            "Please wait",
-            "A document is already being synchronized."
-        );
-
+    if (!file) {
         return;
     }
 
+
+    if (uploadInProgress) {
+        return;
+    }
+
+
+    uploadInProgress = true;
+
+
     // --------------------------------------------------------
-    // Validate file
+    // Validate PDF
     // --------------------------------------------------------
 
     if (
-        file.type !== "application/pdf" &&
         !file.name
             .toLowerCase()
             .endsWith(".pdf")
     ) {
 
-        setUploadStatus(
+        showUploadStatus(
             "error",
             "Invalid file",
             "Please select a PDF file."
         );
 
+        uploadInProgress = false;
+
+        pdfInput.value = "";
+
         return;
     }
+
+
+    // --------------------------------------------------------
+    // Validate size
+    // --------------------------------------------------------
 
     if (file.size <= 0) {
 
-        setUploadStatus(
+        showUploadStatus(
             "error",
             "Invalid file",
-            "The selected PDF is empty."
+            "The selected file is empty."
         );
+
+        uploadInProgress = false;
+
+        pdfInput.value = "";
 
         return;
     }
+
 
     if (file.size > MAX_FILE_SIZE) {
 
-        setUploadStatus(
+        showUploadStatus(
             "error",
             "File too large",
-            "Maximum file size is 10 MB."
+            "Maximum allowed file size is 10 MB."
         );
+
+        uploadInProgress = false;
+
+        pdfInput.value = "";
 
         return;
     }
 
-    ingestionInProgress = true;
 
-    setUploadButtonLoading(true);
+    setUploadButtonLoading(
+        true
+    );
+
+
+    setUploadProgress(
+        0
+    );
+
 
     try {
 
         // ====================================================
-        // STEP 1 — CREATE PRESIGNED URL
+        // STEP 1
+        // Get presigned S3 URL
         // ====================================================
 
-        setUploadProgress(10);
-
-        setUploadStatus(
-            "loading",
+        showUploadStatus(
+            "uploading",
             "Preparing upload",
-            "Requesting secure upload URL..."
+            "Creating a secure S3 upload URL..."
         );
 
-        const createResult =
-            await apiRequest(
-                "/upload",
+
+        console.log(
+            "Requesting presigned URL..."
+        );
+
+
+        const createResponse =
+            await fetch(
+                `${API_BASE_URL}/upload`,
                 {
                     method: "POST",
 
-                    body: {
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
                         action: "create",
-                        filename: file.name,
+
+                        filename:
+                            file.name,
+
                         contentType:
                             "application/pdf",
+
                         fileSize:
                             file.size
-                    }
+
+                    })
                 }
             );
+
+
+        const createResult =
+            await parseApiResponse(
+                createResponse
+            );
+
 
         console.log(
             "Create upload result:",
             createResult
         );
 
-        if (!createResult.success) {
+
+        if (
+            !createResponse.ok ||
+            !createResult.success
+        ) {
 
             throw new Error(
                 createResult.error ||
                 createResult.message ||
-                "Unable to create upload URL."
+                `Failed to create upload URL (${createResponse.status})`
             );
 
         }
+
 
         const uploadUrl =
             createResult.uploadUrl;
 
+
         const uploadKey =
             createResult.key;
 
-        if (!uploadUrl || !uploadKey) {
+
+        if (
+            !uploadUrl ||
+            !uploadKey
+        ) {
 
             throw new Error(
-                "Server did not return upload URL or S3 key."
+                "Server returned an invalid S3 upload response."
             );
 
         }
 
+
         // ====================================================
-        // STEP 2 — DIRECT S3 UPLOAD
+        // STEP 2
+        // Upload directly to S3
         // ====================================================
 
-        setUploadProgress(25);
-
-        setUploadStatus(
-            "loading",
+        showUploadStatus(
+            "uploading",
             "Uploading PDF",
-            "Uploading document directly to S3..."
+            "Uploading your PDF directly to S3..."
         );
+
+
+        console.log(
+            "Uploading directly to S3..."
+        );
+
 
         const s3Response =
             await fetch(
@@ -1066,128 +1085,154 @@ async function uploadPdf(file) {
                 }
             );
 
+
+        console.log(
+            "S3 response:",
+            s3Response.status
+        );
+
+
         if (!s3Response.ok) {
 
             throw new Error(
-                `S3 upload failed with status ${s3Response.status}`
+                `S3 upload failed (${s3Response.status}).`
             );
 
         }
 
+
+        setUploadProgress(
+            100
+        );
+
+
         console.log(
-            "S3 upload completed"
+            "S3 upload completed successfully."
         );
 
+
         // ====================================================
-        // STEP 3 — COMPLETE UPLOAD
+        // STEP 3
+        // Confirm upload with backend
         // ====================================================
 
-        setUploadProgress(60);
-
-        setUploadStatus(
-            "loading",
-            "Starting synchronization",
-            "Starting Knowledge Base synchronization..."
+        showUploadStatus(
+            "processing",
+            "Confirming upload",
+            "Verifying that the PDF was successfully stored in S3..."
         );
 
-        const completeResult =
-            await apiRequest(
-                "/upload",
+
+        console.log(
+            "Confirming S3 upload..."
+        );
+
+
+        const completeResponse =
+            await fetch(
+                `${API_BASE_URL}/upload`,
                 {
                     method: "POST",
 
-                    body: {
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
                         action: "complete",
-                        key: uploadKey,
-                        filename: file.name
-                    }
+
+                        key:
+                            uploadKey,
+
+                        filename:
+                            file.name
+
+                    })
                 }
             );
+
+
+        const completeResult =
+            await parseApiResponse(
+                completeResponse
+            );
+
 
         console.log(
             "Complete upload result:",
             completeResult
         );
 
-        if (!completeResult.success) {
+
+        if (
+            !completeResponse.ok ||
+            !completeResult.success
+        ) {
 
             throw new Error(
                 completeResult.error ||
                 completeResult.message ||
-                "Upload completion failed."
+                `Failed to confirm upload (${completeResponse.status})`
             );
 
         }
 
-        currentIngestionJobId =
-            completeResult.ingestionJobId ||
-            null;
 
         // ====================================================
-        // UPLOAD SUCCESS
+        // IMPORTANT
+        //
+        // DO NOT WAIT FOR BEDROCK INGESTION.
+        //
+        // S3 ObjectCreated automatically triggers:
+        //
+        // S3
+        //   ↓
+        // New Sync Lambda
+        //   ↓
+        // StartIngestionJob
+        //   ↓
+        // Bedrock Knowledge Base
+        //
         // ====================================================
 
-        setUploadProgress(65);
 
-        setUploadStatus(
-            "success",
-            "PDF uploaded successfully",
-            currentIngestionJobId
-                ? "Knowledge Base synchronization is running in the background."
-                : "PDF uploaded successfully."
+        console.log(
+            "PDF successfully uploaded to S3."
         );
 
+
+        console.log(
+            "Knowledge Base synchronization will happen asynchronously."
+        );
+
+
         // ====================================================
-        // BACKGROUND INGESTION POLLING
+        // SUCCESS
         // ====================================================
 
-        if (currentIngestionJobId) {
+        showUploadStatus(
+            "success",
+            "PDF uploaded successfully",
+            "Knowledge Base synchronization will happen automatically in the background."
+        );
 
-            pollIngestionStatus(
-                currentIngestionJobId
-            ).catch(
-                error => {
 
-                    console.error(
-                        "Background ingestion error:",
-                        error
-                    );
+        setUploadProgress(
+            100
+        );
 
-                    ingestionInProgress =
-                        false;
 
-                    currentIngestionJobId =
-                        null;
+        setUploadButtonLoading(
+            false
+        );
 
-                    setUploadStatus(
-                        "error",
-                        "Knowledge Base sync failed",
-                        error.message ||
-                        "Knowledge Base synchronization failed."
-                    );
 
-                    setUploadProgress(0);
+        // Allow same file to be selected again
 
-                    setUploadButtonLoading(
-                        false
-                    );
+        pdfInput.value = "";
 
-                }
-            );
-
-        } else {
-
-            ingestionInProgress =
-                false;
-
-            setUploadButtonLoading(
-                false
-            );
-
-        }
-
-        // Clear selected file
-        $("pdfInput").value = "";
 
     } catch (error) {
 
@@ -1196,20 +1241,26 @@ async function uploadPdf(file) {
             error
         );
 
-        ingestionInProgress =
-            false;
 
-        currentIngestionJobId =
-            null;
-
-        setUploadProgress(0);
-
-        setUploadStatus(
+        showUploadStatus(
             "error",
             "Upload failed",
             error.message ||
-            "Unable to upload PDF."
+                "Something went wrong while uploading the PDF."
         );
+
+
+        setUploadProgress(
+            0
+        );
+
+
+        pdfInput.value = "";
+
+
+    } finally {
+
+        uploadInProgress = false;
 
         setUploadButtonLoading(
             false
@@ -1221,294 +1272,70 @@ async function uploadPdf(file) {
 
 
 // ============================================================
-// POLL INGESTION STATUS
+// UPLOAD STATUS UI
 // ============================================================
 
-async function pollIngestionStatus(
-    jobId
-) {
-
-    if (!jobId) {
-
-        ingestionInProgress =
-            false;
-
-        setUploadButtonLoading(
-            false
-        );
-
-        return;
-
-    }
-
-    const maxAttempts = 120;
-
-    const intervalMs = 5000;
-
-    for (
-        let attempt = 1;
-        attempt <= maxAttempts;
-        attempt++
-    ) {
-
-        console.log(
-            `Checking ingestion status (${attempt}/${maxAttempts})`
-        );
-
-        try {
-
-            const result =
-                await apiRequest(
-                    "/upload",
-                    {
-                        method: "POST",
-
-                        body: {
-                            action: "status",
-                            ingestionJobId:
-                                jobId
-                        }
-                    }
-                );
-
-            console.log(
-                "Ingestion status:",
-                result
-            );
-
-            if (!result.success) {
-
-                throw new Error(
-                    result.error ||
-                    result.message ||
-                    "Unable to check ingestion status."
-                );
-
-            }
-
-            const status =
-                String(
-                    result.status || ""
-                ).toUpperCase();
-
-            // ------------------------------------------------
-            // COMPLETE
-            // ------------------------------------------------
-
-            if (
-                status === "COMPLETE" ||
-                status === "COMPLETED"
-            ) {
-
-                ingestionInProgress =
-                    false;
-
-                currentIngestionJobId =
-                    null;
-
-                setUploadProgress(100);
-
-                setUploadStatus(
-                    "success",
-                    "Knowledge Base synchronized",
-                    "Your document has finished processing."
-                );
-
-                setUploadButtonLoading(
-                    false
-                );
-
-                return;
-
-            }
-
-            // ------------------------------------------------
-            // FAILED
-            // ------------------------------------------------
-
-            if (
-                status === "FAILED" ||
-                status === "STOPPED"
-            ) {
-
-                const failureReason =
-                    Array.isArray(
-                        result.failureReasons
-                    )
-                        ? result.failureReasons.join(
-                            ", "
-                        )
-                        : "Knowledge Base ingestion failed.";
-
-                throw new Error(
-                    failureReason
-                );
-
-            }
-
-            // ------------------------------------------------
-            // IN PROGRESS
-            // ------------------------------------------------
-
-            ingestionInProgress =
-                true;
-
-            const progress =
-                Math.min(
-                    95,
-                    65 +
-                    Math.round(
-                        (attempt /
-                            maxAttempts) *
-                        30
-                    )
-                );
-
-            setUploadProgress(
-                progress
-            );
-
-            setUploadStatus(
-                "loading",
-                "Synchronizing Knowledge Base",
-                `Processing document... ${
-                    status ||
-                    "IN_PROGRESS"
-                }`
-            );
-
-            await sleep(
-                intervalMs
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Ingestion polling error:",
-                error
-            );
-
-            throw error;
-
-        }
-
-    }
-
-    throw new Error(
-        "Knowledge Base synchronization is taking longer than expected. The ingestion job may still be running in AWS."
-    );
-
-}
-
-
-// ============================================================
-// UPLOAD BUTTON LOADING
-// ============================================================
-
-function setUploadButtonLoading(
-    loading
-) {
-
-    const button =
-        $("uploadButton");
-
-    const text =
-        $("uploadButtonText");
-
-    if (!button) {
-        return;
-    }
-
-    button.disabled =
-        loading;
-
-    if (text) {
-
-        text.textContent =
-            loading
-                ? "Uploading..."
-                : "Choose PDF";
-
-    }
-
-}
-
-
-// ============================================================
-// UPLOAD STATUS
-// ============================================================
-
-function setUploadStatus(
+function showUploadStatus(
     type,
     title,
     message
 ) {
 
-    const statusContainer =
-        $("uploadStatus");
-
-    const statusIcon =
-        $("uploadStatusIcon");
-
-    const statusTitle =
-        $("uploadStatusTitle");
-
-    const statusMessage =
-        $("uploadStatusMessage");
-
-    if (!statusContainer) {
-
-        console.log(
-            "Upload status:",
-            type,
-            title,
-            message
-        );
-
+    if (!uploadStatus) {
         return;
     }
 
-    statusContainer.classList.remove(
-        "hidden"
+
+    uploadStatus.classList.remove(
+        "hidden",
+        "success",
+        "error",
+        "uploading",
+        "processing"
     );
 
-    statusContainer.className =
-        `upload-status ${type}`;
 
-    if (statusTitle) {
+    uploadStatus.classList.add(
+        type
+    );
 
-        statusTitle.textContent =
-            title || "";
 
-    }
+    if (uploadStatusTitle) {
 
-    if (statusMessage) {
-
-        statusMessage.textContent =
-            message || "";
+        uploadStatusTitle.textContent =
+            title;
 
     }
 
-    if (statusIcon) {
+
+    if (uploadStatusMessage) {
+
+        uploadStatusMessage.textContent =
+            message;
+
+    }
+
+
+    if (uploadStatusIcon) {
 
         if (type === "success") {
 
-            statusIcon.textContent =
+            uploadStatusIcon.textContent =
                 "✓";
 
         } else if (type === "error") {
 
-            statusIcon.textContent =
-                "!";
+            uploadStatusIcon.textContent =
+                "✕";
 
-        } else if (type === "warning") {
+        } else if (type === "processing") {
 
-            statusIcon.textContent =
-                "!";
+            uploadStatusIcon.textContent =
+                "⏳";
 
         } else {
 
-            statusIcon.textContent =
+            uploadStatusIcon.textContent =
                 "↑";
 
         }
@@ -1523,80 +1350,102 @@ function setUploadStatus(
 // ============================================================
 
 function setUploadProgress(
-    value
+    percentage
 ) {
 
-    const progressBar =
-        $("uploadProgressBar");
-
-    if (!progressBar) {
+    if (!uploadProgressBar) {
         return;
     }
 
-    const percentage =
+
+    const value =
         Math.max(
             0,
             Math.min(
                 100,
-                Number(value) || 0
+                percentage
             )
         );
 
-    progressBar.style.width =
-        `${percentage}%`;
+
+    uploadProgressBar.style.width =
+        `${value}%`;
 
 }
 
 
 // ============================================================
-// QUESTION LOADING
+// UPLOAD BUTTON STATE
 // ============================================================
 
-function setQuestionLoading(
+function setUploadButtonLoading(
     loading
 ) {
 
-    const button =
-        $("askButton");
+    if (!uploadButton) {
+        return;
+    }
 
-    const buttonText =
-        $("askButtonText");
 
-    const buttonIcon =
-        $("askButtonIcon");
+    uploadButton.disabled =
+        loading;
 
-    const input =
-        $("questionInput");
 
-    if (button) {
+    if (uploadButtonText) {
 
-        button.disabled =
-            loading;
+        uploadButtonText.textContent =
+            loading
+                ? "Uploading..."
+                : "Upload PDF";
 
     }
 
-    if (buttonText) {
 
-        buttonText.textContent =
+    if (uploadButtonIcon) {
+
+        uploadButtonIcon.textContent =
+            loading
+                ? "⏳"
+                : "📄";
+
+    }
+
+}
+
+
+// ============================================================
+// ASK BUTTON STATE
+// ============================================================
+
+function setAskButtonLoading(
+    loading
+) {
+
+    if (!askButton) {
+        return;
+    }
+
+
+    askButton.disabled =
+        loading;
+
+
+    if (askButtonText) {
+
+        askButtonText.textContent =
             loading
                 ? "Thinking..."
-                : "Ask Noxora";
+                : "Ask Question";
 
     }
 
-    if (buttonIcon) {
 
-        buttonIcon.textContent =
+    if (askButtonIcon) {
+
+        askButtonIcon.textContent =
             loading
-                ? "..."
-                : "↑";
-
-    }
-
-    if (input) {
-
-        input.disabled =
-            loading;
+                ? "⏳"
+                : "➤";
 
     }
 
@@ -1612,57 +1461,42 @@ function showInputError(
     message
 ) {
 
-    const errorContainer =
-        $("inputError");
-
-    const errorTitle =
-        $("inputErrorTitle");
-
-    const errorMessage =
-        $("inputErrorMessage");
-
-    if (!errorContainer) {
-
-        console.error(
-            title,
-            message
-        );
-
+    if (!inputError) {
         return;
-
     }
 
-    if (errorTitle) {
 
-        errorTitle.textContent =
-            title || "Error";
-
-    }
-
-    if (errorMessage) {
-
-        errorMessage.textContent =
-            message || "";
-
-    }
-
-    errorContainer.classList.remove(
+    inputError.classList.remove(
         "hidden"
     );
+
+
+    if (inputErrorTitle) {
+
+        inputErrorTitle.textContent =
+            title;
+
+    }
+
+
+    if (inputErrorMessage) {
+
+        inputErrorMessage.textContent =
+            message;
+
+    }
 
 }
 
 
 function clearInputError() {
 
-    const errorContainer =
-        $("inputError");
-
-    if (!errorContainer) {
+    if (!inputError) {
         return;
     }
 
-    errorContainer.classList.add(
+
+    inputError.classList.add(
         "hidden"
     );
 
@@ -1670,172 +1504,341 @@ function clearInputError() {
 
 
 // ============================================================
-// DATE FORMAT
+// SOURCES
 // ============================================================
 
-function formatDate(
-    timestamp
+function renderSources(
+    sources
 ) {
 
-    if (!timestamp) {
-        return "";
+    if (
+        !sourcesSection ||
+        !sourcesList
+    ) {
+        return;
     }
 
-    try {
 
-        const date =
-            new Date(timestamp);
+    sourcesList.innerHTML = "";
+
+
+    if (
+        !sources ||
+        sources.length === 0
+    ) {
+
+        sourcesSection.classList.add(
+            "hidden"
+        );
+
+        return;
+    }
+
+
+    sourcesSection.classList.remove(
+        "hidden"
+    );
+
+
+    sources.forEach(
+        (source, index) => {
+
+            if (!source) {
+                return;
+            }
+
+
+            const sourceItem =
+                document.createElement(
+                    "div"
+                );
+
+
+            sourceItem.className =
+                "source-item";
+
+
+            const sourceName =
+                getSourceName(
+                    source.source
+                );
+
+
+            const score =
+                typeof source.score ===
+                    "number"
+                    ? `${(
+                        source.score * 100
+                    ).toFixed(1)}%`
+                    : "";
+
+
+            sourceItem.innerHTML = `
+                <div class="source-header">
+                    <span class="source-number">
+                        ${index + 1}
+                    </span>
+
+                    <span class="source-name">
+                        ${escapeHtml(sourceName)}
+                    </span>
+
+                    ${
+                        score
+                            ? `
+                                <span class="source-score">
+                                    ${escapeHtml(score)}
+                                </span>
+                              `
+                            : ""
+                    }
+                </div>
+            `;
+
+
+            sourcesList.appendChild(
+                sourceItem
+            );
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// SOURCE NAME
+// ============================================================
+
+function getSourceName(
+    source
+) {
+
+    if (!source) {
+        return "Unknown source";
+    }
+
+
+    const sourceString =
+        String(source);
+
+
+    // Remove s3:// prefix
+
+    if (
+        sourceString.startsWith(
+            "s3://"
+        )
+    ) {
+
+        const withoutPrefix =
+            sourceString.substring(
+                5
+            );
+
+
+        const slashIndex =
+            withoutPrefix.indexOf(
+                "/"
+            );
+
 
         if (
-            Number.isNaN(
-                date.getTime()
-            )
+            slashIndex !== -1
         ) {
 
-            return String(
-                timestamp
+            return withoutPrefix.substring(
+                slashIndex + 1
             );
 
         }
 
-        return date.toLocaleString(
-            "en-IN",
-            {
-                dateStyle: "medium",
-                timeStyle: "short"
+
+        return withoutPrefix;
+    }
+
+
+    return sourceString;
+
+}
+
+
+// ============================================================
+// ANSWER FORMATTER
+// ============================================================
+
+function formatAnswer(
+    text
+) {
+
+    if (!text) {
+
+        return `
+            <p>
+                No answer available.
+            </p>
+        `;
+
+    }
+
+
+    let escaped =
+        escapeHtml(
+            String(text)
+        );
+
+
+    // --------------------------------------------------------
+    // Convert markdown-style code blocks
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /```([\s\S]*?)```/g,
+            (match, code) => {
+
+                return `
+                    <pre><code>${code.trim()}</code></pre>
+                `;
+
             }
         );
 
-    } catch {
 
-        return String(
-            timestamp
+    // --------------------------------------------------------
+    // Bold
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
         );
 
-    }
+
+    // --------------------------------------------------------
+    // Inline code
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /`([^`]+)`/g,
+            "<code>$1</code>"
+        );
+
+
+    // --------------------------------------------------------
+    // Headings
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /^### (.*)$/gm,
+            "<h4>$1</h4>"
+        );
+
+
+    escaped =
+        escaped.replace(
+            /^## (.*)$/gm,
+            "<h3>$1</h3>"
+        );
+
+
+    escaped =
+        escaped.replace(
+            /^# (.*)$/gm,
+            "<h2>$1</h2>"
+        );
+
+
+    // --------------------------------------------------------
+    // Bullet lists
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /^[•*-] (.*)$/gm,
+            "<li>$1</li>"
+        );
+
+
+    escaped =
+        escaped.replace(
+            /(<li>.*<\/li>\n?)+/g,
+            (match) => {
+
+                return `<ul>${match}</ul>`;
+
+            }
+        );
+
+
+    // --------------------------------------------------------
+    // Numbered lists
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /^\d+\.\s+(.*)$/gm,
+            "<li>$1</li>"
+        );
+
+
+    // --------------------------------------------------------
+    // Line breaks
+    // --------------------------------------------------------
+
+    escaped =
+        escaped.replace(
+            /\n{2,}/g,
+            "</p><p>"
+        );
+
+
+    escaped =
+        escaped.replace(
+            /\n/g,
+            "<br>"
+        );
+
+
+    // --------------------------------------------------------
+    // Wrap text
+    // --------------------------------------------------------
+
+    return `<p>${escaped}</p>`;
 
 }
 
 
 // ============================================================
-// API REQUEST
-// ============================================================
-
-async function apiRequest(
-    endpoint,
-    options = {}
-) {
-
-    const url =
-        `${API_BASE_URL}${endpoint}`;
-
-    const fetchOptions = {
-        method:
-            options.method || "GET",
-
-        headers: {
-            "Content-Type":
-                "application/json",
-
-            ...(options.headers || {})
-        }
-    };
-
-    if (
-        options.body !== undefined
-    ) {
-
-        fetchOptions.body =
-            typeof options.body ===
-            "string"
-
-                ? options.body
-
-                : JSON.stringify(
-                    options.body
-                );
-
-    }
-
-    console.log(
-        "API Request:",
-        fetchOptions.method,
-        url
-    );
-
-    const response =
-        await fetch(
-            url,
-            fetchOptions
-        );
-
-    const text =
-        await response.text();
-
-    console.log(
-        "API Response Status:",
-        response.status
-    );
-
-    console.log(
-        "API Response:",
-        text
-    );
-
-    let data = {};
-
-    try {
-
-        data =
-            text
-                ? JSON.parse(text)
-                : {};
-
-    } catch (error) {
-
-        console.error(
-            "JSON parse error:",
-            error
-        );
-
-        throw new Error(
-            "Invalid JSON response from server."
-        );
-
-    }
-
-    if (!response.ok) {
-
-        throw new Error(
-            data.error ||
-            data.message ||
-            `Request failed with status ${response.status}`
-        );
-
-    }
-
-    return data;
-
-}
-
-
-// ============================================================
-// ESCAPE HTML
+// HTML ESCAPE
 // ============================================================
 
 function escapeHtml(
     value
 ) {
 
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return "";
+
+    }
+
+
     const div =
         document.createElement(
             "div"
         );
 
+
     div.textContent =
-        value == null
-            ? ""
-            : String(value);
+        String(value);
+
 
     return div.innerHTML;
 
@@ -1843,19 +1846,42 @@ function escapeHtml(
 
 
 // ============================================================
-// SLEEP
+// API RESPONSE PARSER
 // ============================================================
 
-function sleep(
-    ms
+async function parseApiResponse(
+    apiResponse
 ) {
 
-    return new Promise(
-        resolve =>
-            setTimeout(
-                resolve,
-                ms
-            )
-    );
+    const text =
+        await apiResponse.text();
+
+
+    if (!text) {
+
+        return {};
+
+    }
+
+
+    try {
+
+        return JSON.parse(
+            text
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Invalid JSON response:",
+            text
+        );
+
+
+        throw new Error(
+            "Server returned an invalid response."
+        );
+
+    }
 
 }
