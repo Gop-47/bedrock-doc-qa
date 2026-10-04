@@ -20,8 +20,8 @@
 
 
     <!-- =====================================================
-     HEADER
-===================================================== -->
+         HEADER
+    ====================================================== -->
 
     <header class="header">
 
@@ -58,7 +58,11 @@
 
                 <!-- HISTORY BUTTON -->
 
-                <button id="historyButton" class="history-button" type="button">
+                <button
+                    id="historyButton"
+                    class="history-button"
+                    type="button"
+                >
                     ◷ History
                 </button>
 
@@ -84,8 +88,8 @@
 
 
     <!-- =====================================================
-     MAIN
-===================================================== -->
+         MAIN
+    ====================================================== -->
 
     <main>
 
@@ -93,8 +97,8 @@
 
 
             <!-- =================================================
-             HERO
-        ================================================== -->
+                 HERO
+            ================================================== -->
 
             <section class="hero">
 
@@ -126,8 +130,8 @@
 
 
             <!-- =================================================
-             QUERY CARD
-        ================================================== -->
+                 QUERY CARD
+            ================================================== -->
 
             <section class="query-card">
 
@@ -139,23 +143,51 @@
                     </div>
 
 
-                    <div class="rag-badge">
-                        RAG ENABLED
+                    <!-- MODE SELECTOR -->
+
+                    <div
+                        class="mode-toggle"
+                        id="modeToggle"
+                        role="group"
+                        aria-label="AI response mode"
+                    >
+
+                        <button
+                            type="button"
+                            class="mode-option active"
+                            data-mode="rag"
+                            aria-pressed="true"
+                        >
+                            RAG
+                        </button>
+
+                        <button
+                            type="button"
+                            class="mode-option"
+                            data-mode="direct"
+                            aria-pressed="false"
+                        >
+                            Direct AI
+                        </button>
+
                     </div>
 
                 </div>
 
 
 
-                <textarea id="questionInput" placeholder="Ask something about your documents..."
-                    autocomplete="off"></textarea>
+                <textarea
+                    id="questionInput"
+                    placeholder="Ask something about your documents..."
+                    autocomplete="off"
+                ></textarea>
 
 
 
                 <div class="query-footer">
 
 
-                    <div class="input-hint">
+                    <div class="input-hint" id="inputHint">
 
                         Press Enter to ask
                         ·
@@ -164,7 +196,11 @@
                     </div>
 
 
-                    <button id="askButton" class="ask-button" type="button">
+                    <button
+                        id="askButton"
+                        class="ask-button"
+                        type="button"
+                    >
 
                         Ask Noxora
 
@@ -179,8 +215,8 @@
 
 
             <!-- =================================================
-             FEATURES
-        ================================================== -->
+                 FEATURES
+            ================================================== -->
 
             <div class="features">
 
@@ -210,18 +246,22 @@
 
 
             <!-- =================================================
-             LOADING
-        ================================================== -->
+                 LOADING
+            ================================================== -->
 
-            <div id="loadingCard" class="loading-card hidden">
+            <div
+                id="loadingCard"
+                class="loading-card hidden"
+            >
 
                 <div class="spinner"></div>
 
 
-                <div class="loading-text">
-
+                <div
+                    id="loadingText"
+                    class="loading-text"
+                >
                     Searching your knowledge base...
-
                 </div>
 
             </div>
@@ -229,10 +269,13 @@
 
 
             <!-- =================================================
-             ERROR
-        ================================================== -->
+                 ERROR
+            ================================================== -->
 
-            <div id="errorCard" class="error-card hidden">
+            <div
+                id="errorCard"
+                class="error-card hidden"
+            >
 
                 <div id="errorMessage"></div>
 
@@ -241,10 +284,13 @@
 
 
             <!-- =================================================
-             ANSWER
-        ================================================== -->
+                 ANSWER
+            ================================================== -->
 
-            <section id="answerSection" class="answer-section hidden">
+            <section
+                id="answerSection"
+                class="answer-section hidden"
+            >
 
 
                 <div class="result-card">
@@ -268,7 +314,10 @@
                         </div>
 
 
-                        <div id="cacheStatus" class="cache-status"></div>
+                        <div
+                            id="cacheStatus"
+                            class="cache-status"
+                        ></div>
 
 
                     </div>
@@ -283,10 +332,12 @@
                         <div id="answerText"></div>
 
 
-                        <button id="copyButton" class="copy-button" type="button">
-
+                        <button
+                            id="copyButton"
+                            class="copy-button"
+                            type="button"
+                        >
                             Copy answer
-
                         </button>
 
 
@@ -301,23 +352,27 @@
 
 
             <!-- =================================================
-             SOURCES
-        ================================================== -->
+                 SOURCES
+            ================================================== -->
 
-            <section id="sourcesSection" class="sources-section hidden">
+            <section
+                id="sourcesSection"
+                class="sources-section hidden"
+            >
 
 
                 <div class="sources-header">
 
 
                     <div class="sources-title">
-
                         Knowledge Base Sources
-
                     </div>
 
 
-                    <div id="sourcesCount" class="sources-count"></div>
+                    <div
+                        id="sourcesCount"
+                        class="sources-count"
+                    ></div>
 
 
                 </div>
@@ -331,10 +386,13 @@
 
 
             <!-- =================================================
-             HISTORY SECTION
-        ================================================== -->
+                 HISTORY SECTION
+            ================================================== -->
 
-            <section id="historySection" class="history-section hidden">
+            <section
+                id="historySection"
+                class="history-section hidden"
+            >
 
 
                 <div class="history-header">
@@ -343,25 +401,23 @@
                     <div>
 
                         <div class="history-title">
-
                             Query History
-
                         </div>
 
 
                         <div class="history-subtitle">
-
                             Your recent questions and answers
-
                         </div>
 
                     </div>
 
 
-                    <button id="closeHistoryButton" class="history-close-button" type="button">
-
+                    <button
+                        id="closeHistoryButton"
+                        class="history-close-button"
+                        type="button"
+                    >
                         Close
-
                     </button>
 
 
@@ -385,8 +441,8 @@
 
 
     <!-- =====================================================
-     FOOTER
-===================================================== -->
+         FOOTER
+    ====================================================== -->
 
     <footer class="footer">
 
@@ -423,8 +479,8 @@
 
 
     <!-- =====================================================
-     JAVASCRIPT
-===================================================== -->
+         JAVASCRIPT
+    ====================================================== -->
 
     <script src="script.js"></script>
 
