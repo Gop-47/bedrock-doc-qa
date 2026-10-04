@@ -65,6 +65,8 @@ CACHE_TTL = 3600
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 
+MAX_RAG_RESULTS = 5
+
 
 # ============================================================
 # AWS CLIENTS
@@ -79,10 +81,12 @@ history_table = dynamodb.Table(
     DYNAMODB_TABLE
 )
 
+
 s3_client = boto3.client(
     "s3",
     region_name=AWS_REGION
 )
+
 
 # Direct model invocation
 bedrock_runtime_client = boto3.client(
@@ -90,11 +94,13 @@ bedrock_runtime_client = boto3.client(
     region_name=AWS_REGION
 )
 
-# RetrieveAndGenerate
+
+# Managed Knowledge Base retrieval
 bedrock_agent_runtime_client = boto3.client(
     "bedrock-agent-runtime",
     region_name=AWS_REGION
 )
+
 
 # Knowledge Base ingestion
 bedrock_agent_client = boto3.client(
@@ -176,87 +182,6 @@ def parse_body(event):
     except Exception:
 
         return {}
-
-
-# ============================================================
-# GET RAG MODEL ARN
-# ============================================================
-
-def get_rag_model_arn():
-
-    """
-    Convert MODEL_ID into the modelArn required by
-    Bedrock RetrieveAndGenerate.
-
-    IMPORTANT:
-
-    We do NOT call get_inference_profile() here.
-
-    Your MODEL_ID is already a system-defined
-    cross-region inference profile:
-
-        us.anthropic.claude-haiku-4-5-20251001-v1:0
-
-    Therefore we directly construct:
-
-        arn:aws:bedrock:us-east-1::inference-profile/...
-
-    """
-
-    # --------------------------------------------------------
-    # Already an ARN
-    # --------------------------------------------------------
-
-    if MODEL_ID.startswith("arn:"):
-
-        print(
-            f"Using existing model ARN: {MODEL_ID}"
-        )
-
-        return MODEL_ID
-
-    # --------------------------------------------------------
-    # Cross-region / global inference profile
-    # --------------------------------------------------------
-
-    if MODEL_ID.startswith((
-        "us.",
-        "eu.",
-        "apac.",
-        "au.",
-        "jp.",
-        "global."
-    )):
-
-        model_arn = (
-            f"arn:aws:bedrock:"
-            f"{AWS_REGION}"
-            f"::inference-profile/"
-            f"{MODEL_ID}"
-        )
-
-        print(
-            f"Using inference profile ARN: {model_arn}"
-        )
-
-        return model_arn
-
-    # --------------------------------------------------------
-    # Normal foundation model
-    # --------------------------------------------------------
-
-    model_arn = (
-        f"arn:aws:bedrock:"
-        f"{AWS_REGION}"
-        f"::foundation-model/"
-        f"{MODEL_ID}"
-    )
-
-    print(
-        f"Using foundation model ARN: {model_arn}"
-    )
-
-    return model_arn
 
 
 # ============================================================
@@ -432,7 +357,137 @@ def get_history():
 
 
 # ============================================================
+# EXTRACT SOURCE INFORMATION
+# ============================================================
+
+def extract_source_info(
+    reference
+):
+
+    location = reference.get(
+        "location",
+        {}
+    )
+
+    uri = None
+
+    # --------------------------------------------------------
+    # S3 location
+    # --------------------------------------------------------
+
+    s3_location = location.get(
+        "s3Location",
+        {}
+    )
+
+    if s3_location:
+
+        uri = s3_location.get(
+            "uri"
+        )
+
+    # --------------------------------------------------------
+    # Web location
+    # --------------------------------------------------------
+
+    web_location = location.get(
+        "webLocation",
+        {}
+    )
+
+    if not uri and web_location:
+
+        uri = web_location.get(
+            "url"
+        )
+
+    # --------------------------------------------------------
+    # Confluence / SharePoint / other locations
+    # --------------------------------------------------------
+
+    if not uri:
+
+        for location_type in (
+            "confluenceLocation",
+            "sharePointLocation",
+            "salesforceLocation",
+            "kendraDocumentLocation"
+        ):
+
+            location_data = location.get(
+                location_type,
+                {}
+            )
+
+            if location_data:
+
+                uri = (
+                    location_data.get("url")
+                    or
+                    location_data.get("documentId")
+                    or
+                    location_data.get("name")
+                )
+
+                if uri:
+                    break
+
+    # --------------------------------------------------------
+    # Filename
+    # --------------------------------------------------------
+
+    filename = None
+
+    if uri:
+
+        filename = uri.rstrip(
+            "/"
+        ).split(
+            "/"
+        )[-1]
+
+    # --------------------------------------------------------
+    # Content
+    # --------------------------------------------------------
+
+    content = reference.get(
+        "content",
+        {}
+    )
+
+    source_text = content.get(
+        "text",
+        ""
+    )
+
+    # --------------------------------------------------------
+    # Score
+    # --------------------------------------------------------
+
+    score = reference.get(
+        "score"
+    )
+
+    return {
+        "uri": uri,
+        "filename": filename,
+        "text": source_text,
+        "score": score
+    }
+
+
+# ============================================================
 # RAG QUERY
+#
+# MANAGED KNOWLEDGE BASE
+#
+# Retrieve
+#     ↓
+# Relevant document chunks
+#     ↓
+# Claude
+#     ↓
+# Answer
 # ============================================================
 
 def query_knowledge_base(
@@ -440,127 +495,330 @@ def query_knowledge_base(
 ):
 
     print(
-        f"Running RAG query: {question}"
-    )
-
-    model_arn = get_rag_model_arn()
-
-    print(
-        f"Knowledge Base ID: "
-        f"{KNOWLEDGE_BASE_ID}"
+        "================================================"
     )
 
     print(
-        f"Using model ARN: "
-        f"{model_arn}"
+        "Running Managed Knowledge Base RAG"
     )
 
-    result = (
-        bedrock_agent_runtime_client
-        .retrieve_and_generate(
-            input={
-                "text": question
-            },
+    print(
+        f"Question: {question}"
+    )
 
-            retrieveAndGenerateConfiguration={
-                "type": "KNOWLEDGE_BASE",
+    print(
+        f"Knowledge Base ID: {KNOWLEDGE_BASE_ID}"
+    )
 
-                "knowledgeBaseConfiguration": {
+    print(
+        f"Model ID: {MODEL_ID}"
+    )
 
-                    "knowledgeBaseId":
-                        KNOWLEDGE_BASE_ID,
+    print(
+        "================================================"
+    )
 
-                    "modelArn":
-                        model_arn,
+    # ========================================================
+    # STEP 1
+    # RETRIEVE FROM MANAGED KNOWLEDGE BASE
+    # ========================================================
 
-                    "retrievalConfiguration": {
+    try:
 
-                        "vectorSearchConfiguration": {
+        retrieve_result = (
+            bedrock_agent_runtime_client
+            .retrieve(
 
-                            "numberOfResults": 5
+                knowledgeBaseId=
+                    KNOWLEDGE_BASE_ID,
 
-                        }
+                retrievalQuery={
+                    "text":
+                        question
+                },
+
+                retrievalConfiguration={
+
+                    "managedSearchConfiguration": {
+
+                        "numberOfResults":
+                            MAX_RAG_RESULTS
 
                     }
 
                 }
-            }
+            )
+        )
+
+    except ClientError as e:
+
+        print(
+            "Knowledge Base retrieve error:"
+        )
+
+        print(
+            str(e)
+        )
+
+        raise
+
+    retrieval_results = (
+        retrieve_result.get(
+            "retrievalResults",
+            []
         )
     )
 
-    answer = (
-        result
-        .get(
-            "output",
-            {}
-        )
-        .get(
-            "text",
-            ""
-        )
+    print(
+        f"Retrieved chunks: "
+        f"{len(retrieval_results)}"
     )
 
-    citations = result.get(
-        "citations",
-        []
-    )
+    # ========================================================
+    # NO RESULTS
+    # ========================================================
+
+    if not retrieval_results:
+
+        return {
+            "answer":
+                "I could not find relevant "
+                "information in the uploaded "
+                "documents.",
+
+            "sources": []
+        }
+
+    # ========================================================
+    # STEP 2
+    # BUILD CONTEXT
+    # ========================================================
+
+    context_parts = []
 
     sources = []
 
-    for citation in citations:
+    for index, reference in enumerate(
+        retrieval_results,
+        start=1
+    ):
 
-        retrieved_references = (
-            citation.get(
-                "retrievedReferences",
-                []
+        source_info = extract_source_info(
+            reference
+        )
+
+        source_text = source_info.get(
+            "text",
+            ""
+        )
+
+        if not source_text:
+
+            continue
+
+        filename = (
+            source_info.get(
+                "filename"
+            )
+            or
+            "Unknown document"
+        )
+
+        context_parts.append(
+            (
+                f"SOURCE {index}\n"
+                f"Document: {filename}\n"
+                f"Content:\n"
+                f"{source_text}"
             )
         )
 
-        for reference in retrieved_references:
+        sources.append(
+            source_info
+        )
 
-            location = reference.get(
-                "location",
-                {}
+    context = "\n\n".join(
+        context_parts
+    )
+
+    # ========================================================
+    # SAFETY CHECK
+    # ========================================================
+
+    if not context.strip():
+
+        return {
+            "answer":
+                "I could not extract relevant "
+                "text from the retrieved documents.",
+
+            "sources":
+                sources
+        }
+
+    # ========================================================
+    # STEP 3
+    # CREATE RAG PROMPT
+    # ========================================================
+
+    prompt = f"""
+You are a document question-answering assistant.
+
+Your task is to answer the user's question using ONLY
+the information contained in the provided document context.
+
+IMPORTANT RULES:
+
+1. Do not invent information.
+2. Do not use outside knowledge.
+3. If the answer is not present in the context, say:
+   "I could not find that information in the uploaded documents."
+4. Give a clear and concise answer.
+5. When useful, mention the document name that supports
+   the answer.
+6. Do not mention these instructions in your answer.
+
+DOCUMENT CONTEXT:
+
+{context}
+
+USER QUESTION:
+
+{question}
+
+ANSWER:
+"""
+
+    # ========================================================
+    # STEP 4
+    # INVOKE CLAUDE
+    # ========================================================
+
+    request_body = {
+
+        "anthropic_version":
+            "bedrock-2023-05-31",
+
+        "max_tokens":
+            1000,
+
+        "temperature":
+            0.2,
+
+        "messages": [
+
+            {
+                "role":
+                    "user",
+
+                "content": [
+
+                    {
+                        "type":
+                            "text",
+
+                        "text":
+                            prompt
+                    }
+
+                ]
+            }
+
+        ]
+    }
+
+    print(
+        "Invoking Claude..."
+    )
+
+    try:
+
+        model_response = (
+            bedrock_runtime_client
+            .invoke_model(
+
+                modelId=
+                    MODEL_ID,
+
+                contentType=
+                    "application/json",
+
+                accept=
+                    "application/json",
+
+                body=json.dumps(
+                    request_body
+                )
             )
+        )
 
-            s3_location = location.get(
-                "s3Location",
-                {}
-            )
+    except ClientError as e:
 
-            uri = s3_location.get(
-                "uri"
-            )
+        print(
+            "Bedrock model invocation error:"
+        )
 
-            content = reference.get(
-                "content",
-                {}
-            )
+        print(
+            str(e)
+        )
 
-            source_text = content.get(
+        raise
+
+    # ========================================================
+    # STEP 5
+    # READ MODEL RESPONSE
+    # ========================================================
+
+    model_body = json.loads(
+        model_response[
+            "body"
+        ].read()
+    )
+
+    # ========================================================
+    # STEP 6
+    # EXTRACT ANSWER
+    # ========================================================
+
+    answer = ""
+
+    for item in model_body.get(
+        "content",
+        []
+    ):
+
+        if item.get(
+            "type"
+        ) == "text":
+
+            answer += item.get(
                 "text",
                 ""
             )
 
-            filename = None
+    answer = answer.strip()
 
-            if uri:
+    if not answer:
 
-                filename = uri.split(
-                    "/"
-                )[-1]
+        answer = (
+            "The model did not return an answer."
+        )
 
-            sources.append(
-                {
-                    "uri": uri,
-                    "filename": filename,
-                    "text": source_text
-                }
-            )
+    print(
+        "RAG answer generated successfully."
+    )
+
+    # ========================================================
+    # RETURN
+    # ========================================================
 
     return {
-        "answer": answer,
-        "sources": sources
+
+        "answer":
+            answer,
+
+        "sources":
+            sources
     }
 
 
@@ -605,13 +863,16 @@ def query_direct_ai(
 
                 ]
             }
+
         ]
     }
 
     response_data = (
         bedrock_runtime_client
         .invoke_model(
-            modelId=MODEL_ID,
+
+            modelId=
+                MODEL_ID,
 
             contentType=
                 "application/json",
@@ -648,8 +909,11 @@ def query_direct_ai(
             )
 
     return {
-        "answer": answer,
-        "sources": []
+        "answer":
+            answer.strip(),
+
+        "sources":
+            []
     }
 
 
@@ -673,7 +937,10 @@ def resolve_mode(
 
         requested_mode = DEFAULT_MODE
 
+    # --------------------------------------------------------
     # Direct AI disabled
+    # --------------------------------------------------------
+
     if (
         requested_mode == "direct"
         and not DIRECT_AI_ENABLED
@@ -750,9 +1017,9 @@ def handle_query(
         f"{mode}"
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # CACHE
-    # --------------------------------------------------------
+    # ========================================================
 
     cached = get_cached_answer(
         mode,
@@ -768,20 +1035,63 @@ def handle_query(
             cached
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # QUERY
-    # --------------------------------------------------------
+    # ========================================================
 
-    if mode == "direct":
+    try:
 
-        result = query_direct_ai(
-            question
+        if mode == "direct":
+
+            result = query_direct_ai(
+                question
+            )
+
+        else:
+
+            result = query_knowledge_base(
+                question
+            )
+
+    except ClientError as e:
+
+        print(
+            "AWS query error:"
         )
 
-    else:
+        print(
+            str(e)
+        )
 
-        result = query_knowledge_base(
-            question
+        return response(
+            500,
+            {
+                "error":
+                    "AWS Bedrock query failed.",
+
+                "details":
+                    str(e)
+            }
+        )
+
+    except Exception as e:
+
+        print(
+            "Query error:"
+        )
+
+        print(
+            f"{type(e).__name__}: "
+            f"{str(e)}"
+        )
+
+        return response(
+            500,
+            {
+                "error":
+                    f"{type(e).__name__}: "
+                    f"{str(e)}"
+            }
         )
 
     answer = result.get(
@@ -794,9 +1104,9 @@ def handle_query(
         []
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # RESULT
-    # --------------------------------------------------------
+    # ========================================================
 
     result_data = {
 
@@ -816,9 +1126,9 @@ def handle_query(
             False
     }
 
-    # --------------------------------------------------------
+    # ========================================================
     # CACHE
-    # --------------------------------------------------------
+    # ========================================================
 
     cache_answer(
         mode,
@@ -826,9 +1136,9 @@ def handle_query(
         result_data
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # HISTORY
-    # --------------------------------------------------------
+    # ========================================================
 
     save_history(
         question,
@@ -913,9 +1223,9 @@ def create_upload_url(
         filename
     )
 
-    # --------------------------------------------------------
-    # PDF validation
-    # --------------------------------------------------------
+    # ========================================================
+    # PDF VALIDATION
+    # ========================================================
 
     if not filename.lower().endswith(
         ".pdf"
@@ -929,9 +1239,9 @@ def create_upload_url(
             }
         )
 
-    # --------------------------------------------------------
-    # Content type
-    # --------------------------------------------------------
+    # ========================================================
+    # CONTENT TYPE
+    # ========================================================
 
     if content_type:
 
@@ -948,9 +1258,9 @@ def create_upload_url(
                 }
             )
 
-    # --------------------------------------------------------
-    # Size
-    # --------------------------------------------------------
+    # ========================================================
+    # SIZE
+    # ========================================================
 
     try:
 
@@ -988,9 +1298,9 @@ def create_upload_url(
             }
         )
 
-    # --------------------------------------------------------
-    # S3 key
-    # --------------------------------------------------------
+    # ========================================================
+    # S3 KEY
+    # ========================================================
 
     unique_id = str(
         uuid.uuid4()
@@ -1002,16 +1312,19 @@ def create_upload_url(
         f"{filename}"
     )
 
-    # --------------------------------------------------------
-    # Presigned PUT
-    # --------------------------------------------------------
+    # ========================================================
+    # PRESIGNED PUT
+    # ========================================================
 
     upload_url = (
         s3_client
         .generate_presigned_url(
-            ClientMethod="put_object",
+
+            ClientMethod=
+                "put_object",
 
             Params={
+
                 "Bucket":
                     UPLOAD_BUCKET,
 
@@ -1020,6 +1333,7 @@ def create_upload_url(
 
                 "ContentType":
                     "application/pdf"
+
             },
 
             ExpiresIn=300
@@ -1033,6 +1347,7 @@ def create_upload_url(
     return response(
         200,
         {
+
             "uploadUrl":
                 upload_url,
 
@@ -1075,7 +1390,10 @@ def complete_upload(
             }
         )
 
-    # Security check
+    # ========================================================
+    # SECURITY CHECK
+    # ========================================================
+
     if not key.startswith(
         "uploads/"
     ):
@@ -1088,15 +1406,19 @@ def complete_upload(
             }
         )
 
-    # --------------------------------------------------------
-    # Verify S3 object
-    # --------------------------------------------------------
+    # ========================================================
+    # VERIFY S3 OBJECT
+    # ========================================================
 
     try:
 
         head = s3_client.head_object(
-            Bucket=UPLOAD_BUCKET,
-            Key=key
+
+            Bucket=
+                UPLOAD_BUCKET,
+
+            Key=
+                key
         )
 
     except ClientError as e:
@@ -1110,7 +1432,8 @@ def complete_upload(
             400,
             {
                 "error":
-                    "Uploaded PDF was not found in S3."
+                    "Uploaded PDF was not "
+                    "found in S3."
             }
         )
 
@@ -1125,7 +1448,8 @@ def complete_upload(
             400,
             {
                 "error":
-                    "Uploaded PDF exceeds 10 MB."
+                    "Uploaded PDF exceeds "
+                    "10 MB."
             }
         )
 
@@ -1142,19 +1466,21 @@ def complete_upload(
             400,
             {
                 "error":
-                    "Uploaded object is not a PDF."
+                    "Uploaded object is "
+                    "not a PDF."
             }
         )
 
-    # --------------------------------------------------------
-    # Start Knowledge Base ingestion
-    # --------------------------------------------------------
+    # ========================================================
+    # START KNOWLEDGE BASE INGESTION
+    # ========================================================
 
     try:
 
         ingestion = (
             bedrock_agent_client
             .start_ingestion_job(
+
                 knowledgeBaseId=
                     KNOWLEDGE_BASE_ID,
 
@@ -1173,9 +1499,11 @@ def complete_upload(
         return response(
             500,
             {
+
                 "error":
                     "PDF uploaded, but Knowledge "
-                    "Base ingestion could not be started.",
+                    "Base ingestion could not be "
+                    "started.",
 
                 "details":
                     str(e)
@@ -1205,6 +1533,7 @@ def complete_upload(
     return response(
         200,
         {
+
             "message":
                 "PDF uploaded successfully. "
                 "Knowledge Base ingestion started.",
@@ -1255,6 +1584,7 @@ def get_upload_status(
         result = (
             bedrock_agent_client
             .get_ingestion_job(
+
                 knowledgeBaseId=
                     KNOWLEDGE_BASE_ID,
 
@@ -1276,8 +1606,10 @@ def get_upload_status(
         return response(
             500,
             {
+
                 "error":
-                    "Could not get ingestion status.",
+                    "Could not get ingestion "
+                    "status.",
 
                 "details":
                     str(e)
@@ -1292,6 +1624,7 @@ def get_upload_status(
     return response(
         200,
         {
+
             "ingestionJobId":
                 ingestion_job.get(
                     "ingestionJobId"
@@ -1354,6 +1687,7 @@ def handle_history():
         return response(
             500,
             {
+
                 "error":
                     "Could not retrieve history.",
 
@@ -1391,9 +1725,9 @@ def lambda_handler(
 
     try:
 
-        # ----------------------------------------------------
-        # HTTP method
-        # ----------------------------------------------------
+        # ====================================================
+        # HTTP METHOD
+        # ====================================================
 
         http_method = (
             event.get(
@@ -1415,9 +1749,9 @@ def lambda_handler(
             "POST"
         )
 
-        # ----------------------------------------------------
-        # Path
-        # ----------------------------------------------------
+        # ====================================================
+        # PATH
+        # ====================================================
 
         path = event.get(
             "path"
@@ -1449,9 +1783,9 @@ def lambda_handler(
             f"Path: {path}"
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # CORS
-        # ----------------------------------------------------
+        # ====================================================
 
         if http_method.upper() == "OPTIONS":
 
@@ -1553,6 +1887,7 @@ def lambda_handler(
         return response(
             404,
             {
+
                 "error":
                     "Route not found.",
 
@@ -1585,6 +1920,7 @@ def lambda_handler(
         return response(
             500,
             {
+
                 "error":
                     f"{type(e).__name__}: "
                     f"{str(e)}"
