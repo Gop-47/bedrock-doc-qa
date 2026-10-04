@@ -236,8 +236,20 @@ def cache_answer(question, mode, data):
 
 def query_knowledge_base(question):
     print(
-        f"Querying Knowledge Base: "
-        f"{KNOWLEDGE_BASE_ID}"
+        f"Querying Knowledge Base: {KNOWLEDGE_BASE_ID}"
+    )
+
+    # For cross-region/inference-profile model IDs such as:
+    # us.anthropic.claude-haiku-4-5-20251001-v1:0
+    # use the inference-profile ARN.
+    model_arn = (
+        f"arn:aws:bedrock:{AWS_REGION}:"
+        f"{boto3.client('sts').get_caller_identity()['Account']}:"
+        f"inference-profile/{MODEL_ID}"
+    )
+
+    print(
+        f"Using model ARN: {model_arn}"
     )
 
     response_data = bedrock_agent_client.retrieve_and_generate(
@@ -248,10 +260,7 @@ def query_knowledge_base(question):
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": KNOWLEDGE_BASE_ID,
-                "modelArn": (
-                    f"arn:aws:bedrock:{AWS_REGION}:"
-                    f"::foundation-model/{MODEL_ID}"
-                )
+                "modelArn": model_arn
             }
         }
     )
@@ -269,11 +278,14 @@ def query_knowledge_base(question):
         []
     ):
         retrieved_references = (
-            citation
-            .get("retrievedReferences", [])
+            citation.get(
+                "retrievedReferences",
+                []
+            )
         )
 
         for reference in retrieved_references:
+
             location = reference.get(
                 "location",
                 {}
@@ -305,7 +317,6 @@ def query_knowledge_base(question):
         "answer": output,
         "sources": citations
     }
-
 
 # ============================================================
 # DIRECT CLAUDE QUERY
