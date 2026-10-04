@@ -13,17 +13,46 @@ const MAX_FILE_SIZE =
 // DOM ELEMENTS
 // ============================================================
 
+// ------------------------------------------------------------
+// HISTORY
+// ------------------------------------------------------------
+
 const historyCount =
     document.getElementById("historyCount");
 
+const historyButton =
+    document.getElementById("historyButton");
+
+const historyButtonCount =
+    document.getElementById("historyButtonCount");
+
+const historyCloseButton =
+    document.getElementById("historyCloseButton");
+
+const historyOverlay =
+    document.getElementById("historyOverlay");
+
+const historyPanel =
+    document.getElementById("historyPanel");
+
 const historyList =
     document.getElementById("historyList");
+
+
+// ------------------------------------------------------------
+// MODE
+// ------------------------------------------------------------
 
 const modeToggle =
     document.getElementById("modeToggle");
 
 const modeOptions =
     document.querySelectorAll(".mode-option");
+
+
+// ------------------------------------------------------------
+// QUESTION
+// ------------------------------------------------------------
 
 const questionForm =
     document.getElementById("questionForm");
@@ -43,6 +72,11 @@ const askButtonText =
 const askButtonIcon =
     document.getElementById("askButtonIcon");
 
+
+// ------------------------------------------------------------
+// INPUT ERROR
+// ------------------------------------------------------------
+
 const inputError =
     document.getElementById("inputError");
 
@@ -51,6 +85,11 @@ const inputErrorTitle =
 
 const inputErrorMessage =
     document.getElementById("inputErrorMessage");
+
+
+// ------------------------------------------------------------
+// UPLOAD
+// ------------------------------------------------------------
 
 const uploadPanel =
     document.getElementById("uploadPanel");
@@ -81,6 +120,11 @@ const uploadStatusMessage =
 
 const uploadProgressBar =
     document.getElementById("uploadProgressBar");
+
+
+// ------------------------------------------------------------
+// ANSWER
+// ------------------------------------------------------------
 
 const answerSection =
     document.getElementById("answerSection");
@@ -126,6 +170,8 @@ document.addEventListener(
 
         initializeUpload();
 
+        initializeHistoryDrawer();
+
         loadHistory();
 
     }
@@ -138,7 +184,10 @@ document.addEventListener(
 
 function initializeMode() {
 
-    if (!modeOptions || modeOptions.length === 0) {
+    if (
+        !modeOptions ||
+        modeOptions.length === 0
+    ) {
         return;
     }
 
@@ -196,7 +245,186 @@ function updateModeUI() {
                     : "false"
             );
 
+            button.setAttribute(
+                "aria-pressed",
+                isActive
+                    ? "true"
+                    : "false"
+            );
+
         }
+    );
+}
+
+
+// ============================================================
+// HISTORY DRAWER
+// ============================================================
+
+function initializeHistoryDrawer() {
+
+    if (historyButton) {
+
+        historyButton.addEventListener(
+            "click",
+            () => {
+
+                if (
+                    historyPanel &&
+                    historyPanel.classList.contains(
+                        "open"
+                    )
+                ) {
+
+                    closeHistoryDrawer();
+
+                } else {
+
+                    openHistoryDrawer();
+
+                }
+
+            }
+        );
+
+    }
+
+
+    if (historyCloseButton) {
+
+        historyCloseButton.addEventListener(
+            "click",
+            () => {
+
+                closeHistoryDrawer();
+
+            }
+        );
+
+    }
+
+
+    if (historyOverlay) {
+
+        historyOverlay.addEventListener(
+            "click",
+            () => {
+
+                closeHistoryDrawer();
+
+            }
+        );
+
+    }
+
+
+    document.addEventListener(
+        "keydown",
+        (event) => {
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                closeHistoryDrawer();
+
+            }
+
+        }
+    );
+}
+
+
+function openHistoryDrawer() {
+
+    if (!historyPanel) {
+        return;
+    }
+
+    historyPanel.classList.add(
+        "open"
+    );
+
+
+    if (historyOverlay) {
+
+        historyOverlay.classList.add(
+            "open"
+        );
+
+        historyOverlay.setAttribute(
+            "aria-hidden",
+            "false"
+        );
+
+    }
+
+
+    historyPanel.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    if (historyButton) {
+
+        historyButton.setAttribute(
+            "aria-expanded",
+            "true"
+        );
+
+    }
+
+
+    document.body.classList.add(
+        "history-drawer-open"
+    );
+}
+
+
+function closeHistoryDrawer() {
+
+    if (!historyPanel) {
+        return;
+    }
+
+    historyPanel.classList.remove(
+        "open"
+    );
+
+
+    if (historyOverlay) {
+
+        historyOverlay.classList.remove(
+            "open"
+        );
+
+        historyOverlay.setAttribute(
+            "aria-hidden",
+            "true"
+        );
+
+    }
+
+
+    historyPanel.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    if (historyButton) {
+
+        historyButton.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+    }
+
+
+    document.body.classList.remove(
+        "history-drawer-open"
     );
 }
 
@@ -211,6 +439,7 @@ function initializeQuestionForm() {
         return;
     }
 
+
     questionForm.addEventListener(
         "submit",
         async (event) => {
@@ -222,9 +451,6 @@ function initializeQuestionForm() {
         }
     );
 
-
-    // Enter = submit
-    // Shift + Enter = new line
 
     if (questionInput) {
 
@@ -261,7 +487,9 @@ async function askQuestion() {
             ? questionInput.value.trim()
             : "";
 
+
     clearInputError();
+
 
     if (!question) {
 
@@ -270,15 +498,20 @@ async function askQuestion() {
             "Please enter a question before asking."
         );
 
+
         if (questionInput) {
+
             questionInput.focus();
+
         }
 
         return;
     }
 
 
-    setAskButtonLoading(true);
+    setAskButtonLoading(
+        true
+    );
 
 
     try {
@@ -306,8 +539,11 @@ async function askQuestion() {
                     },
 
                     body: JSON.stringify({
-                        question: question,
-                        mode: currentMode
+                        question:
+                            question,
+
+                        mode:
+                            currentMode
                     })
                 }
             );
@@ -339,29 +575,32 @@ async function askQuestion() {
         }
 
 
-        // Display answer
-
         showAnswer({
+
             question:
-                result.question || question,
+                result.question ||
+                question,
 
             answer:
-                result.answer || "",
+                result.answer ||
+                "",
 
             mode:
-                result.mode || currentMode,
+                result.mode ||
+                currentMode,
 
             cached:
                 result.cached === true,
 
             sources:
-                Array.isArray(result.sources)
+                Array.isArray(
+                    result.sources
+                )
                     ? result.sources
                     : []
+
         });
 
-
-        // Refresh history
 
         await loadHistory();
 
@@ -383,7 +622,9 @@ async function askQuestion() {
 
     } finally {
 
-        setAskButtonLoading(false);
+        setAskButtonLoading(
+            false
+        );
 
     }
 }
@@ -393,7 +634,9 @@ async function askQuestion() {
 // SHOW ANSWER
 // ============================================================
 
-function showAnswer(item) {
+function showAnswer(
+    item
+) {
 
     if (!answerSection) {
         return;
@@ -415,46 +658,38 @@ function showAnswer(item) {
 
 
     const sources =
-        Array.isArray(item.sources)
+        Array.isArray(
+            item.sources
+        )
             ? item.sources
             : [];
 
-
-    // --------------------------------------------------------
-    // Show answer section
-    // --------------------------------------------------------
 
     answerSection.classList.remove(
         "hidden"
     );
 
 
-    // Some designs may use display:none
-    // instead of hidden class.
+    answerSection.style.display =
+        "";
 
-    answerSection.style.display = "";
-
-
-    // --------------------------------------------------------
-    // Answer
-    // --------------------------------------------------------
 
     if (answerContent) {
 
         answerContent.innerHTML =
-            formatAnswer(answer);
+            formatAnswer(
+                answer
+            );
 
     }
 
 
-    // --------------------------------------------------------
-    // Mode badge
-    // --------------------------------------------------------
-
     if (answerModeBadge) {
 
         answerModeBadge.textContent =
-            mode.toUpperCase();
+            mode === "direct"
+                ? "DIRECT AI"
+                : "KNOWLEDGE BASE";
 
         answerModeBadge.style.display =
             "inline-flex";
@@ -462,16 +697,12 @@ function showAnswer(item) {
     }
 
 
-    // --------------------------------------------------------
-    // Cache badge
-    // --------------------------------------------------------
-
     if (cacheBadge) {
 
         if (cached) {
 
             cacheBadge.textContent =
-                "Cached";
+                "CACHED";
 
             cacheBadge.style.display =
                 "inline-flex";
@@ -486,14 +717,9 @@ function showAnswer(item) {
     }
 
 
-    // --------------------------------------------------------
-    // Sources
-    // --------------------------------------------------------
-
     renderSources(
         sources
     );
-
 }
 
 
@@ -546,7 +772,9 @@ async function loadHistory() {
 
 
         historyData =
-            Array.isArray(result.history)
+            Array.isArray(
+                result.history
+            )
                 ? result.history
                 : [];
 
@@ -565,6 +793,7 @@ async function loadHistory() {
 
 
         historyData = [];
+
 
         renderHistory(
             historyData,
@@ -589,31 +818,42 @@ function renderHistory(
     }
 
 
-    historyList.innerHTML = "";
+    historyList.innerHTML =
+        "";
 
 
     // --------------------------------------------------------
-    // History error
+    // ERROR
     // --------------------------------------------------------
 
     if (hasError) {
 
         historyList.innerHTML = `
             <div class="history-empty">
-                Unable to load history
+
+                <div class="history-empty-icon">
+                    !
+                </div>
+
+                <span>
+                    Unable to load history
+                </span>
+
             </div>
         `;
 
-        if (historyCount) {
-            historyCount.textContent = "0";
-        }
+
+        updateHistoryCount(
+            0
+        );
+
 
         return;
     }
 
 
     // --------------------------------------------------------
-    // No history
+    // EMPTY
     // --------------------------------------------------------
 
     if (
@@ -623,36 +863,43 @@ function renderHistory(
 
         historyList.innerHTML = `
             <div class="history-empty">
-                No questions yet
+
+                <div class="history-empty-icon">
+                    ◌
+                </div>
+
+                <span>
+                    No queries yet
+                </span>
+
             </div>
         `;
 
-        if (historyCount) {
-            historyCount.textContent = "0";
-        }
+
+        updateHistoryCount(
+            0
+        );
+
 
         return;
     }
 
 
     // --------------------------------------------------------
-    // Count
+    // COUNT
     // --------------------------------------------------------
 
-    if (historyCount) {
-
-        historyCount.textContent =
-            history.length.toString();
-
-    }
+    updateHistoryCount(
+        history.length
+    );
 
 
     // --------------------------------------------------------
-    // Render questions ONLY
+    // HISTORY ITEMS
     // --------------------------------------------------------
 
     history.forEach(
-        (item, index) => {
+        (item) => {
 
             if (!item) {
                 return;
@@ -707,7 +954,31 @@ function renderHistory(
 
         }
     );
+}
 
+
+// ============================================================
+// HISTORY COUNT
+// ============================================================
+
+function updateHistoryCount(
+    count
+) {
+
+    if (historyCount) {
+
+        historyCount.textContent =
+            String(count);
+
+    }
+
+
+    if (historyButtonCount) {
+
+        historyButtonCount.textContent =
+            String(count);
+
+    }
 }
 
 
@@ -715,7 +986,9 @@ function renderHistory(
 // SHOW HISTORY ANSWER
 // ============================================================
 
-function showHistoryAnswer(item) {
+function showHistoryAnswer(
+    item
+) {
 
     if (!item) {
         return;
@@ -746,25 +1019,30 @@ function showHistoryAnswer(item) {
 
 
     // --------------------------------------------------------
-    // Show answer
+    // Restore answer
     // --------------------------------------------------------
 
     showAnswer({
 
         question:
-            item.question || "",
+            item.question ||
+            "",
 
         answer:
-            item.answer || "",
+            item.answer ||
+            "",
 
         mode:
-            item.mode || "rag",
+            item.mode ||
+            "rag",
 
         cached:
             item.cached === true,
 
         sources:
-            Array.isArray(item.sources)
+            Array.isArray(
+                item.sources
+            )
                 ? item.sources
                 : []
 
@@ -772,22 +1050,26 @@ function showHistoryAnswer(item) {
 
 
     // --------------------------------------------------------
-    // Put question into input
+    // Restore question
     // --------------------------------------------------------
 
     if (questionInput) {
 
         questionInput.value =
-            item.question || "";
+            item.question ||
+            "";
 
     }
 
 
+    clearInputError();
+
+
     // --------------------------------------------------------
-    // Remove input error
+    // Close history drawer
     // --------------------------------------------------------
 
-    clearInputError();
+    closeHistoryDrawer();
 
 
     // --------------------------------------------------------
@@ -805,11 +1087,10 @@ function showHistoryAnswer(item) {
                 });
 
             },
-            50
+            100
         );
 
     }
-
 }
 
 
@@ -819,7 +1100,11 @@ function showHistoryAnswer(item) {
 
 function initializeUpload() {
 
-    if (!uploadButton || !pdfInput) {
+    if (
+        !uploadButton ||
+        !pdfInput
+    ) {
+
         console.warn(
             "Upload elements not found."
         );
@@ -827,8 +1112,6 @@ function initializeUpload() {
         return;
     }
 
-
-    // Clicking upload button opens file picker
 
     uploadButton.addEventListener(
         "click",
@@ -843,8 +1126,6 @@ function initializeUpload() {
         }
     );
 
-
-    // File selected
 
     pdfInput.addEventListener(
         "change",
@@ -866,7 +1147,6 @@ function initializeUpload() {
 
         }
     );
-
 }
 
 
@@ -874,7 +1154,9 @@ function initializeUpload() {
 // UPLOAD PDF
 // ============================================================
 
-async function uploadPdf(file) {
+async function uploadPdf(
+    file
+) {
 
     if (!file) {
         return;
@@ -886,11 +1168,12 @@ async function uploadPdf(file) {
     }
 
 
-    uploadInProgress = true;
+    uploadInProgress =
+        true;
 
 
     // --------------------------------------------------------
-    // Validate PDF
+    // PDF validation
     // --------------------------------------------------------
 
     if (
@@ -905,16 +1188,21 @@ async function uploadPdf(file) {
             "Please select a PDF file."
         );
 
-        uploadInProgress = false;
 
-        pdfInput.value = "";
+        uploadInProgress =
+            false;
+
+
+        pdfInput.value =
+            "";
+
 
         return;
     }
 
 
     // --------------------------------------------------------
-    // Validate size
+    // Empty file
     // --------------------------------------------------------
 
     if (file.size <= 0) {
@@ -925,25 +1213,42 @@ async function uploadPdf(file) {
             "The selected file is empty."
         );
 
-        uploadInProgress = false;
 
-        pdfInput.value = "";
+        uploadInProgress =
+            false;
+
+
+        pdfInput.value =
+            "";
+
 
         return;
     }
 
 
-    if (file.size > MAX_FILE_SIZE) {
+    // --------------------------------------------------------
+    // Size validation
+    // --------------------------------------------------------
+
+    if (
+        file.size >
+        MAX_FILE_SIZE
+    ) {
 
         showUploadStatus(
             "error",
             "File too large",
-            "Maximum allowed file size is 10 MB."
+            "Maximum allowed size is 10 MB."
         );
 
-        uploadInProgress = false;
 
-        pdfInput.value = "";
+        uploadInProgress =
+            false;
+
+
+        pdfInput.value =
+            "";
+
 
         return;
     }
@@ -963,7 +1268,7 @@ async function uploadPdf(file) {
 
         // ====================================================
         // STEP 1
-        // Get presigned S3 URL
+        // CREATE PRESIGNED URL
         // ====================================================
 
         showUploadStatus(
@@ -991,7 +1296,8 @@ async function uploadPdf(file) {
 
                     body: JSON.stringify({
 
-                        action: "create",
+                        action:
+                            "create",
 
                         filename:
                             file.name,
@@ -1055,7 +1361,7 @@ async function uploadPdf(file) {
 
         // ====================================================
         // STEP 2
-        // Upload directly to S3
+        // DIRECT S3 UPLOAD
         // ====================================================
 
         showUploadStatus(
@@ -1081,7 +1387,8 @@ async function uploadPdf(file) {
                             "application/pdf"
                     },
 
-                    body: file
+                    body:
+                        file
                 }
             );
 
@@ -1092,7 +1399,9 @@ async function uploadPdf(file) {
         );
 
 
-        if (!s3Response.ok) {
+        if (
+            !s3Response.ok
+        ) {
 
             throw new Error(
                 `S3 upload failed (${s3Response.status}).`
@@ -1113,13 +1422,26 @@ async function uploadPdf(file) {
 
         // ====================================================
         // STEP 3
-        // Confirm upload with backend
+        // CONFIRM UPLOAD
+        //
+        // IMPORTANT:
+        //
+        // This does NOT wait for Bedrock ingestion.
+        //
+        // S3 ObjectCreated triggers:
+        //
+        // S3
+        //   ↓
+        // bedrock-doc-qa-kb-sync
+        //   ↓
+        // StartIngestionJob
+        //
         // ====================================================
 
         showUploadStatus(
             "processing",
             "Confirming upload",
-            "Verifying that the PDF was successfully stored in S3..."
+            "Verifying the upload with Noxora..."
         );
 
 
@@ -1141,7 +1463,8 @@ async function uploadPdf(file) {
 
                     body: JSON.stringify({
 
-                        action: "complete",
+                        action:
+                            "complete",
 
                         key:
                             uploadKey,
@@ -1181,36 +1504,19 @@ async function uploadPdf(file) {
 
 
         // ====================================================
-        // IMPORTANT
-        //
-        // DO NOT WAIT FOR BEDROCK INGESTION.
-        //
-        // S3 ObjectCreated automatically triggers:
-        //
-        // S3
-        //   ↓
-        // New Sync Lambda
-        //   ↓
-        // StartIngestionJob
-        //   ↓
-        // Bedrock Knowledge Base
-        //
-        // ====================================================
-
-
-        console.log(
-            "PDF successfully uploaded to S3."
-        );
-
-
-        console.log(
-            "Knowledge Base synchronization will happen asynchronously."
-        );
-
-
-        // ====================================================
         // SUCCESS
         // ====================================================
+
+        console.log(
+            "PDF successfully uploaded."
+        );
+
+
+        console.log(
+            "Knowledge Base synchronization "
+            + "will happen asynchronously."
+        );
+
 
         showUploadStatus(
             "success",
@@ -1224,14 +1530,8 @@ async function uploadPdf(file) {
         );
 
 
-        setUploadButtonLoading(
-            false
-        );
-
-
-        // Allow same file to be selected again
-
-        pdfInput.value = "";
+        pdfInput.value =
+            "";
 
 
     } catch (error) {
@@ -1255,19 +1555,21 @@ async function uploadPdf(file) {
         );
 
 
-        pdfInput.value = "";
+        pdfInput.value =
+            "";
 
 
     } finally {
 
-        uploadInProgress = false;
+        uploadInProgress =
+            false;
+
 
         setUploadButtonLoading(
             false
         );
 
     }
-
 }
 
 
@@ -1318,17 +1620,23 @@ function showUploadStatus(
 
     if (uploadStatusIcon) {
 
-        if (type === "success") {
+        if (
+            type === "success"
+        ) {
 
             uploadStatusIcon.textContent =
                 "✓";
 
-        } else if (type === "error") {
+        } else if (
+            type === "error"
+        ) {
 
             uploadStatusIcon.textContent =
                 "✕";
 
-        } else if (type === "processing") {
+        } else if (
+            type === "processing"
+        ) {
 
             uploadStatusIcon.textContent =
                 "⏳";
@@ -1341,7 +1649,6 @@ function showUploadStatus(
         }
 
     }
-
 }
 
 
@@ -1370,7 +1677,6 @@ function setUploadProgress(
 
     uploadProgressBar.style.width =
         `${value}%`;
-
 }
 
 
@@ -1396,7 +1702,7 @@ function setUploadButtonLoading(
         uploadButtonText.textContent =
             loading
                 ? "Uploading..."
-                : "Upload PDF";
+                : "Choose PDF";
 
     }
 
@@ -1406,10 +1712,9 @@ function setUploadButtonLoading(
         uploadButtonIcon.textContent =
             loading
                 ? "⏳"
-                : "📄";
+                : "↑";
 
     }
-
 }
 
 
@@ -1435,7 +1740,7 @@ function setAskButtonLoading(
         askButtonText.textContent =
             loading
                 ? "Thinking..."
-                : "Ask Question";
+                : "Ask Noxora";
 
     }
 
@@ -1445,10 +1750,9 @@ function setAskButtonLoading(
         askButtonIcon.textContent =
             loading
                 ? "⏳"
-                : "➤";
+                : "↑";
 
     }
-
 }
 
 
@@ -1485,7 +1789,6 @@ function showInputError(
             message;
 
     }
-
 }
 
 
@@ -1499,7 +1802,6 @@ function clearInputError() {
     inputError.classList.add(
         "hidden"
     );
-
 }
 
 
@@ -1515,11 +1817,13 @@ function renderSources(
         !sourcesSection ||
         !sourcesList
     ) {
+
         return;
     }
 
 
-    sourcesList.innerHTML = "";
+    sourcesList.innerHTML =
+        "";
 
 
     if (
@@ -1567,14 +1871,17 @@ function renderSources(
             const score =
                 typeof source.score ===
                     "number"
+
                     ? `${(
                         source.score * 100
                     ).toFixed(1)}%`
+
                     : "";
 
 
             sourceItem.innerHTML = `
                 <div class="source-header">
+
                     <span class="source-number">
                         ${index + 1}
                     </span>
@@ -1592,6 +1899,7 @@ function renderSources(
                               `
                             : ""
                     }
+
                 </div>
             `;
 
@@ -1602,7 +1910,6 @@ function renderSources(
 
         }
     );
-
 }
 
 
@@ -1615,15 +1922,15 @@ function getSourceName(
 ) {
 
     if (!source) {
+
         return "Unknown source";
+
     }
 
 
     const sourceString =
         String(source);
 
-
-    // Remove s3:// prefix
 
     if (
         sourceString.startsWith(
@@ -1659,7 +1966,6 @@ function getSourceName(
 
 
     return sourceString;
-
 }
 
 
@@ -1689,7 +1995,7 @@ function formatAnswer(
 
 
     // --------------------------------------------------------
-    // Convert markdown-style code blocks
+    // Code blocks
     // --------------------------------------------------------
 
     escaped =
@@ -1768,7 +2074,11 @@ function formatAnswer(
             /(<li>.*<\/li>\n?)+/g,
             (match) => {
 
-                return `<ul>${match}</ul>`;
+                return `
+                    <ul>
+                        ${match}
+                    </ul>
+                `;
 
             }
         );
@@ -1786,7 +2096,7 @@ function formatAnswer(
 
 
     // --------------------------------------------------------
-    // Line breaks
+    // Paragraphs / line breaks
     // --------------------------------------------------------
 
     escaped =
@@ -1803,12 +2113,11 @@ function formatAnswer(
         );
 
 
-    // --------------------------------------------------------
-    // Wrap text
-    // --------------------------------------------------------
-
-    return `<p>${escaped}</p>`;
-
+    return `
+        <p>
+            ${escaped}
+        </p>
+    `;
 }
 
 
@@ -1841,7 +2150,6 @@ function escapeHtml(
 
 
     return div.innerHTML;
-
 }
 
 
@@ -1883,5 +2191,4 @@ async function parseApiResponse(
         );
 
     }
-
 }
