@@ -1,14 +1,12 @@
 import os
 import json
-import uuid
-import hashlib
 import logging
-from decimal import Decimal
+import uuid
+import re
+import time
 from datetime import datetime, timezone
 
 import boto3
-import redis
-
 
 # ============================================================
 # LOGGING
@@ -17,12 +15,11 @@ import redis
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
 # ============================================================
-# ENVIRONMENT VARIABLES
+# ENVIRONMENT
 # ============================================================
 
-AWS_REGION = os.environ.get(
+REGION = os.environ.get(
     "AWS_REGION",
     "us-east-1"
 )
@@ -32,7 +29,7 @@ KNOWLEDGE_BASE_ID = os.environ.get(
     "PPJG45JPD3"
 )
 
-KNOWLEDGE_BASE_DATA_SOURCE_ID = os.environ.get(
+DATA_SOURCE_ID = os.environ.get(
     "KNOWLEDGE_BASE_DATA_SOURCE_ID",
     "SRASBTFSWJ"
 )
@@ -42,32 +39,27 @@ MODEL_ID = os.environ.get(
     "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
 
+UPLOAD_BUCKET = os.environ.get(
+    "UPLOAD_BUCKET",
+    "bedrock-doc-qa-documents-gopi"
+)
+
 DYNAMODB_TABLE = os.environ.get(
     "DYNAMODB_TABLE",
     "bedrock-qa-history"
 )
 
 REDIS_ENDPOINT = os.environ.get(
-    "REDIS_ENDPOINT",
-    ""
+    "REDIS_ENDPOINT"
 )
 
-UPLOAD_BUCKET = os.environ.get(
-    "UPLOAD_BUCKET",
-    "bedrock-doc-qa-documents-gopi"
-)
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 
-DEFAULT_MODE = os.environ.get(
-    "DEFAULT_MODE",
-    "rag"
-)
-
-DIRECT_AI_ENABLED = (
+MAX_RAG_RESULTS = int(
     os.environ.get(
-        "DIRECT_AI_ENABLED",
-        "true"
-    ).lower()
-    == "true"
+        "MAX_RAG_RESULTS",
+        "5"
+    )
 )
 
 CACHE_TTL = int(
@@ -77,72 +69,33 @@ CACHE_TTL = int(
     )
 )
 
-MAX_UPLOAD_SIZE = int(
-    os.environ.get(
-        "MAX_UPLOAD_SIZE",
-        str(10 * 1024 * 1024)
-    )
-)
-
-MAX_RAG_RESULTS = int(
-    os.environ.get(
-        "MAX_RAG_RESULTS",
-        "5"
-    )
-)
-
-
-# ============================================================
-# CORS
-# ============================================================
-
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": (
-        "Content-Type,X-Amz-Date,Authorization,"
-        "X-Api-Key,X-Amz-Security-Token"
-    ),
-    "Access-Control-Allow-Methods": (
-        "GET,POST,OPTIONS"
-    ),
-    "Content-Type": "application/json"
-}
-
-
 # ============================================================
 # AWS CLIENTS
 # ============================================================
 
-dynamodb = boto3.resource(
-    "dynamodb",
-    region_name=AWS_REGION
-)
-
-table = dynamodb.Table(
-    DYNAMODB_TABLE
-)
-
 s3_client = boto3.client(
     "s3",
-    region_name=AWS_REGION
+    region_name=REGION
 )
 
 bedrock_runtime = boto3.client(
     "bedrock-runtime",
-    region_name=AWS_REGION
+    region_name=REGION
 )
 
 bedrock_agent_runtime = boto3.client(
     "bedrock-agent-runtime",
-    region_name=AWS_REGION
+    region_name=REGION
 )
 
-# NOTE:
-# bedrock-agent client is no longer required here for
-# upload ingestion.
-#
-# The NEW Lambda handles StartIngestionJob.
+dynamodb = boto3.resource(
+    "dynamodb",
+    region_name=REGION
+)
 
+history_table = dynamodb.Table(
+    DYNAMODB_TABLE
+)
 
 # ============================================================
 # REDIS
@@ -151,8 +104,8 @@ bedrock_agent_runtime = boto3.client(
 redis_client = None
 
 if REDIS_ENDPOINT:
-
     try:
+        import redis
 
         redis_client = redis.Redis(
             host=REDIS_ENDPOINT,
@@ -170,7 +123,6 @@ if REDIS_ENDPOINT:
         )
 
     except Exception as e:
-
         logger.warning(
             "Redis unavailable: %s",
             str(e)
@@ -178,39 +130,105 @@ if REDIS_ENDPOINT:
 
         redis_client = None
 
+# ============================================================
+# CORS
+# ============================================================
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+        "Content-Type,Authorization",
+    "Access-Control-Allow-Methods":
+        "OPTIONS,GET,POST,PUT"
+}
 
 # ============================================================
-# RESPONSE HELPER
+# RESPONSE
 # ============================================================
 
-def response(status_code, body):
-
+def response(
+    status_code,
+    body
+):
     return {
         "statusCode": status_code,
-        "headers": CORS_HEADERS,
+        "headers": {
+            **CORS_HEADERS,
+            "Content-Type": "application/json"
+        },
         "body": json.dumps(
             body,
             default=str
         )
     }
 
-
 # ============================================================
 # HISTORY
 # ============================================================
 
-def get_history():
+def save_history(
+    question,
+    answer,
+    mode,
+    cached=False,
+    sources=None
+):
+    try:
+        query_id = str(
+            uuid.uuid4()
+        )
 
+        timestamp = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        item = {
+            "query_id": query_id,
+            "timestamp": timestamp,
+            "question": question,
+            "answer": answer,
+            "mode": mode,
+            "cached": cached,
+            "sources": sources or []
+        }
+
+        history_table.put_item(
+            Item=item
+        )
+
+        logger.info(
+            "History saved: %s",
+            query_id
+        )
+
+    except Exception as e:
+        # History failure must NOT break
+        # a successful question response.
+        logger.exception(
+            "Failed to save history: %s",
+            str(e)
+        )
+
+# ============================================================
+# GET HISTORY
+# ============================================================
+
+def get_history():
     try:
 
-        items = []
+        result = history_table.scan()
 
-        scan_kwargs = {}
+        items = result.get(
+            "Items",
+            []
+        )
 
-        while True:
+        # Handle pagination
+        while "LastEvaluatedKey" in result:
 
-            result = table.scan(
-                **scan_kwargs
+            result = history_table.scan(
+                ExclusiveStartKey=
+                    result["LastEvaluatedKey"]
             )
 
             items.extend(
@@ -220,25 +238,13 @@ def get_history():
                 )
             )
 
-            last_key = result.get(
-                "LastEvaluatedKey"
-            )
-
-            if not last_key:
-                break
-
-            scan_kwargs[
-                "ExclusiveStartKey"
-            ] = last_key
-
         # Newest first
         items.sort(
-            key=lambda x: str(
+            key=lambda x:
                 x.get(
                     "timestamp",
                     ""
-                )
-            ),
+                ),
             reverse=True
         )
 
@@ -253,7 +259,7 @@ def get_history():
     except Exception as e:
 
         logger.exception(
-            "Failed to get history"
+            "History error"
         )
 
         return response(
@@ -264,91 +270,109 @@ def get_history():
             }
         )
 
-
 # ============================================================
-# SOURCE EXTRACTION
+# SOURCE INFORMATION
 # ============================================================
 
-def extract_source_info(result):
+def extract_source_info(
+    citation
+):
+    try:
 
-    content = result.get(
-        "content",
-        {}
-    )
-
-    location = result.get(
-        "location",
-        {}
-    )
-
-    text_content = content.get(
-        "text",
-        ""
-    )
-
-    score = result.get(
-        "score"
-    )
-
-    source = "Unknown"
-
-    s3_location = location.get(
-        "s3Location"
-    )
-
-    web_location = location.get(
-        "webLocation"
-    )
-
-    if s3_location:
-
-        source = s3_location.get(
-            "uri",
-            "Unknown"
+        location = (
+            citation
+            .get("location", {})
         )
 
-    elif web_location:
-
-        source = web_location.get(
-            "url",
-            "Unknown"
+        s3_location = (
+            location
+            .get("s3Location", {})
         )
 
-    return {
-        "text": text_content,
-        "score": score,
-        "source": source
-    }
+        uri = s3_location.get(
+            "uri"
+        )
 
+        metadata = citation.get(
+            "metadata",
+            {}
+        )
+
+        score = citation.get(
+            "score"
+        )
+
+        return {
+            "source": uri,
+            "score": score,
+            "metadata": metadata
+        }
+
+    except Exception as e:
+
+        logger.warning(
+            "Unable to extract source: %s",
+            str(e)
+        )
+
+        return {
+            "source": None,
+            "score": None,
+            "metadata": {}
+        }
 
 # ============================================================
 # CLAUDE INVOCATION
 # ============================================================
 
-def invoke_claude(prompt):
-
-    body = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1000,
-        "temperature": 0.2,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    }
-
+def invoke_claude(
+    prompt
+):
     logger.info(
         "Invoking Bedrock model: %s",
         MODEL_ID
     )
+
+    start_time = time.time()
+
+    body = {
+        "anthropic_version":
+            "bedrock-2023-05-31",
+
+        "max_tokens":
+            1000,
+
+        "temperature":
+            0.2,
+
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
 
     result = bedrock_runtime.invoke_model(
         modelId=MODEL_ID,
         body=json.dumps(body),
         contentType="application/json",
         accept="application/json"
+    )
+
+    elapsed = (
+        time.time() -
+        start_time
+    )
+
+    logger.info(
+        "Claude invocation completed in %.2f seconds",
+        elapsed
     )
 
     response_body = json.loads(
@@ -361,38 +385,65 @@ def invoke_claude(prompt):
     )
 
     if not content:
+        return ""
 
-        raise ValueError(
-            "Bedrock returned empty response"
-        )
+    text_parts = []
 
-    return content[0].get(
-        "text",
-        ""
-    )
+    for item in content:
 
+        if item.get("type") == "text":
+
+            text_parts.append(
+                item.get(
+                    "text",
+                    ""
+                )
+            )
+
+    return "\n".join(
+        text_parts
+    ).strip()
 
 # ============================================================
 # KNOWLEDGE BASE RETRIEVAL
 # ============================================================
 
-def query_knowledge_base(question):
-
+def query_knowledge_base(
+    question
+):
     logger.info(
-        "Querying Knowledge Base: %s",
-        question
+        "Starting Knowledge Base retrieval"
     )
 
-    result = bedrock_agent_runtime.retrieve(
-        knowledgeBaseId=KNOWLEDGE_BASE_ID,
-        retrievalConfiguration={
-            "managedSearchConfiguration": {
-                "numberOfResults": MAX_RAG_RESULTS
+    start_time = time.time()
+
+    result = (
+        bedrock_agent_runtime
+        .retrieve(
+            knowledgeBaseId=
+                KNOWLEDGE_BASE_ID,
+
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {
+                    "numberOfResults":
+                        MAX_RAG_RESULTS
+                }
+            },
+
+            retrievalQuery={
+                "text": question
             }
-        },
-        retrievalQuery={
-            "text": question
-        }
+        )
+    )
+
+    elapsed = (
+        time.time() -
+        start_time
+    )
+
+    logger.info(
+        "Knowledge Base retrieval completed in %.2f seconds",
+        elapsed
     )
 
     results = result.get(
@@ -407,47 +458,52 @@ def query_knowledge_base(question):
 
     return results
 
-
 # ============================================================
-# CACHE HELPERS
+# CACHE KEY
 # ============================================================
 
-def create_cache_key(question, mode):
-
-    raw_key = (
-        f"{mode}:"
-        f"{question.strip().lower()}"
+def create_cache_key(
+    question,
+    mode
+):
+    normalized = (
+        question
+        .strip()
+        .lower()
     )
 
     return (
-        "qa:"
-        + hashlib.sha256(
-            raw_key.encode("utf-8")
-        ).hexdigest()
+        f"bedrock-qa:"
+        f"{mode}:"
+        f"{normalized}"
     )
 
+# ============================================================
+# CACHE GET
+# ============================================================
 
-def get_cached_answer(cache_key):
-
+def get_cached_answer(
+    cache_key
+):
     if not redis_client:
         return None
 
     try:
 
-        cached = redis_client.get(
+        value = redis_client.get(
             cache_key
         )
 
-        if cached:
+        if not value:
+            return None
 
-            logger.info(
-                "Cache hit: %s",
-                cache_key
-            )
+        logger.info(
+            "Redis cache HIT"
+        )
 
-            return json.loads(
-                cached
-            )
+        return json.loads(
+            value
+        )
 
     except Exception as e:
 
@@ -456,14 +512,16 @@ def get_cached_answer(cache_key):
             str(e)
         )
 
-    return None
+        return None
 
+# ============================================================
+# CACHE SET
+# ============================================================
 
 def set_cached_answer(
     cache_key,
     data
 ):
-
     if not redis_client:
         return
 
@@ -479,8 +537,7 @@ def set_cached_answer(
         )
 
         logger.info(
-            "Cache stored: %s",
-            cache_key
+            "Redis cache SET"
         )
 
     except Exception as e:
@@ -490,16 +547,18 @@ def set_cached_answer(
             str(e)
         )
 
+# ============================================================
+# CLEAR CACHE
+# ============================================================
 
 def clear_rag_cache():
-
     if not redis_client:
         return
 
     try:
 
         keys = redis_client.keys(
-            "qa:*"
+            "bedrock-qa:rag:*"
         )
 
         if keys:
@@ -509,127 +568,33 @@ def clear_rag_cache():
             )
 
             logger.info(
-                "Cleared %d cached answers",
+                "Cleared %d RAG cache entries",
                 len(keys)
             )
 
     except Exception as e:
 
         logger.warning(
-            "Failed to clear Redis cache: %s",
+            "Failed to clear RAG cache: %s",
             str(e)
         )
 
-
 # ============================================================
-# SAVE HISTORY
+# RAG QUESTION
 # ============================================================
 
-def save_history(
-    question,
-    answer,
-    mode,
-    sources=None,
-    cached=False
+def handle_rag_question(
+    question
 ):
-
-    try:
-
-        timestamp = datetime.now(
-            timezone.utc
-        ).isoformat()
-
-        query_id = str(
-            uuid.uuid4()
-        )
-
-        item = {
-            "query_id": query_id,
-            "timestamp": timestamp,
-            "question": question,
-            "answer": answer,
-            "mode": mode,
-            "cached": cached
-        }
-
-        if sources is not None:
-
-            item["sources"] = sources
-
-        table.put_item(
-            Item=item
-        )
-
-        logger.info(
-            "History saved: %s",
-            query_id
-        )
-
-    except Exception as e:
-
-        logger.warning(
-            "Failed to save history: %s",
-            str(e)
-        )
-
-
-# ============================================================
-# QUERY HANDLER
-# ============================================================
-
-def handle_query(body):
-
-    question = body.get(
-        "question",
-        ""
-    ).strip()
-
-    mode = body.get(
-        "mode",
-        DEFAULT_MODE
-    ).lower()
-
-    if not question:
-
-        return response(
-            400,
-            {
-                "success": False,
-                "error": "Question is required"
-            }
-        )
-
-    if mode not in [
-        "rag",
-        "direct"
-    ]:
-
-        mode = DEFAULT_MODE
-
-    if (
-        mode == "direct"
-        and not DIRECT_AI_ENABLED
-    ):
-
-        return response(
-            400,
-            {
-                "success": False,
-                "error": "Direct AI mode is disabled"
-            }
-        )
-
-    # ========================================================
-    # CACHE
-    # ========================================================
-
     cache_key = create_cache_key(
         question,
-        mode
+        "rag"
     )
 
-    cached_data = get_cached_answer(
-        cache_key
+    cached_data = (
+        get_cached_answer(
+            cache_key
+        )
     )
 
     if cached_data:
@@ -644,12 +609,292 @@ def handle_query(body):
             []
         )
 
+        return {
+            "answer": answer,
+            "sources": sources,
+            "cached": True
+        }
+
+    retrieval_results = (
+        query_knowledge_base(
+            question
+        )
+    )
+
+    if not retrieval_results:
+
+        answer = (
+            "I couldn't find relevant "
+            "information in the Knowledge Base."
+        )
+
+        result = {
+            "answer": answer,
+            "sources": [],
+            "cached": False
+        }
+
         save_history(
             question,
             answer,
-            mode,
-            sources,
-            cached=True
+            "rag",
+            False,
+            []
+        )
+
+        return result
+
+    # --------------------------------------------------------
+    # Build context
+    # --------------------------------------------------------
+
+    context_parts = []
+    sources = []
+
+    for index, item in enumerate(
+        retrieval_results
+    ):
+
+        text_content = (
+            item.get(
+                "content",
+                {}
+            )
+            .get(
+                "text",
+                ""
+            )
+        )
+
+        if text_content:
+
+            context_parts.append(
+                f"[Context {index + 1}]\n"
+                f"{text_content}"
+            )
+
+        source_info = (
+            extract_source_info(
+                item
+            )
+        )
+
+        if source_info.get(
+            "source"
+        ):
+
+            sources.append(
+                source_info
+            )
+
+    context = "\n\n".join(
+        context_parts
+    )
+
+    # --------------------------------------------------------
+    # Prompt
+    # --------------------------------------------------------
+
+    prompt = f"""
+You are a helpful document question-answering assistant.
+
+Answer the user's question using ONLY the information
+provided in the Knowledge Base context below.
+
+If the answer cannot be determined from the context,
+say that the information was not found in the documents.
+
+Do not invent facts.
+
+Be clear and concise.
+
+Knowledge Base Context:
+-----------------------
+{context}
+-----------------------
+
+User Question:
+{question}
+"""
+
+    answer = invoke_claude(
+        prompt
+    )
+
+    if not answer:
+
+        answer = (
+            "I couldn't generate an answer "
+            "from the Knowledge Base."
+        )
+
+    result = {
+        "answer": answer,
+        "sources": sources,
+        "cached": False
+    }
+
+    set_cached_answer(
+        cache_key,
+        result
+    )
+
+    save_history(
+        question,
+        answer,
+        "rag",
+        False,
+        sources
+    )
+
+    return result
+
+# ============================================================
+# DIRECT QUESTION
+# ============================================================
+
+def handle_direct_question(
+    question
+):
+    cache_key = create_cache_key(
+        question,
+        "direct"
+    )
+
+    cached_data = (
+        get_cached_answer(
+            cache_key
+        )
+    )
+
+    if cached_data:
+
+        answer = cached_data.get(
+            "answer",
+            ""
+        )
+
+        return {
+            "answer": answer,
+            "sources": [],
+            "cached": True
+        }
+
+    prompt = f"""
+You are a helpful AI assistant.
+
+Answer the following question accurately
+and clearly.
+
+Question:
+{question}
+"""
+
+    answer = invoke_claude(
+        prompt
+    )
+
+    result = {
+        "answer": answer,
+        "sources": [],
+        "cached": False
+    }
+
+    set_cached_answer(
+        cache_key,
+        result
+    )
+
+    save_history(
+        question,
+        answer,
+        "direct",
+        False,
+        []
+    )
+
+    return result
+
+# ============================================================
+# QUERY
+# ============================================================
+
+def handle_query(
+    body
+):
+    question = (
+        body.get(
+            "question",
+            ""
+        )
+        .strip()
+    )
+
+    mode = (
+        body.get(
+            "mode",
+            "rag"
+        )
+        .strip()
+        .lower()
+    )
+
+    if not question:
+
+        return response(
+            400,
+            {
+                "success": False,
+                "error":
+                    "Question is required."
+            }
+        )
+
+    if mode not in (
+        "rag",
+        "direct"
+    ):
+
+        mode = "rag"
+
+    logger.info(
+        "Question received: %s",
+        question
+    )
+
+    logger.info(
+        "Question mode: %s",
+        mode
+    )
+
+    start_time = time.time()
+
+    try:
+
+        if mode == "rag":
+
+            result = (
+                handle_rag_question(
+                    question
+                )
+            )
+
+        else:
+
+            result = (
+                handle_direct_question(
+                    question
+                )
+            )
+
+        elapsed = (
+            time.time() -
+            start_time
+        )
+
+        logger.info(
+            "Question completed in %.2f seconds",
+            elapsed
         )
 
         return response(
@@ -657,166 +902,66 @@ def handle_query(body):
             {
                 "success": True,
                 "question": question,
-                "answer": answer,
+                "answer":
+                    result.get(
+                        "answer",
+                        ""
+                    ),
                 "mode": mode,
-                "sources": sources,
-                "cached": True
+                "cached":
+                    result.get(
+                        "cached",
+                        False
+                    ),
+                "sources":
+                    result.get(
+                        "sources",
+                        []
+                    )
             }
         )
 
-    # ========================================================
-    # DIRECT AI
-    # ========================================================
+    except Exception as e:
 
-    if mode == "direct":
-
-        prompt = f"""
-Answer the following question clearly and accurately.
-
-Question:
-{question}
-"""
-
-        answer = invoke_claude(
-            prompt
+        logger.exception(
+            "Question processing failed"
         )
 
-        sources = []
-
-    # ========================================================
-    # RAG
-    # ========================================================
-
-    else:
-
-        retrieval_results = (
-            query_knowledge_base(
-                question
-            )
+        return response(
+            500,
+            {
+                "success": False,
+                "error": str(e)
+            }
         )
-
-        sources = [
-            extract_source_info(
-                item
-            )
-            for item in retrieval_results
-        ]
-
-        context_parts = []
-
-        for item in sources:
-
-            text_content = item.get(
-                "text",
-                ""
-            )
-
-            if text_content:
-
-                context_parts.append(
-                    text_content
-                )
-
-        context = "\n\n".join(
-            context_parts
-        )
-
-        if not context:
-
-            answer = (
-                "I couldn't find relevant "
-                "information in the Knowledge Base."
-            )
-
-        else:
-
-            prompt = f"""
-You are a helpful AI assistant.
-
-Answer the user's question using ONLY
-the provided context.
-
-If the answer cannot be found in the
-context, clearly say that the information
-is not available in the provided documents.
-
-Context:
-{context}
-
-Question:
-{question}
-"""
-
-            answer = invoke_claude(
-                prompt
-            )
-
-    # ========================================================
-    # CACHE RESULT
-    # ========================================================
-
-    cache_data = {
-        "answer": answer,
-        "sources": sources
-    }
-
-    set_cached_answer(
-        cache_key,
-        cache_data
-    )
-
-    # ========================================================
-    # SAVE HISTORY
-    # ========================================================
-
-    save_history(
-        question,
-        answer,
-        mode,
-        sources,
-        cached=False
-    )
-
-    # ========================================================
-    # RESPONSE
-    # ========================================================
-
-    return response(
-        200,
-        {
-            "success": True,
-            "question": question,
-            "answer": answer,
-            "mode": mode,
-            "sources": sources,
-            "cached": False
-        }
-    )
-
 
 # ============================================================
-# CREATE PRESIGNED UPLOAD URL
+# CREATE UPLOAD URL
 # ============================================================
 
-def create_upload_url(body):
-
-    filename = body.get(
-        "filename",
-        ""
+def create_upload_url(
+    body
+):
+    filename = (
+        body.get(
+            "filename",
+            ""
+        )
+        .strip()
     )
 
-    content_type = body.get(
-        "contentType",
-        ""
+    content_type = (
+        body.get(
+            "contentType",
+            "application/pdf"
+        )
+        .strip()
+        .lower()
     )
 
     file_size = body.get(
         "fileSize"
     )
-
-    # --------------------------------------------------------
-    # Validate filename
-    # --------------------------------------------------------
 
     if not filename:
 
@@ -824,7 +969,8 @@ def create_upload_url(body):
             400,
             {
                 "success": False,
-                "error": "Filename is required"
+                "error":
+                    "Filename is required."
             }
         )
 
@@ -836,13 +982,10 @@ def create_upload_url(body):
             400,
             {
                 "success": False,
-                "error": "Only PDF files are allowed"
+                "error":
+                    "Only PDF files are allowed."
             }
         )
-
-    # --------------------------------------------------------
-    # Validate content type
-    # --------------------------------------------------------
 
     if content_type != "application/pdf":
 
@@ -850,13 +993,10 @@ def create_upload_url(body):
             400,
             {
                 "success": False,
-                "error": "Content-Type must be application/pdf"
+                "error":
+                    "Content-Type must be application/pdf."
             }
         )
-
-    # --------------------------------------------------------
-    # Validate file size if supplied
-    # --------------------------------------------------------
 
     if file_size is not None:
 
@@ -866,13 +1006,14 @@ def create_upload_url(body):
                 file_size
             )
 
-        except (TypeError, ValueError):
+        except Exception:
 
             return response(
                 400,
                 {
                     "success": False,
-                    "error": "Invalid file size"
+                    "error":
+                        "Invalid file size."
                 }
             )
 
@@ -882,7 +1023,8 @@ def create_upload_url(body):
                 400,
                 {
                     "success": False,
-                    "error": "File is empty"
+                    "error":
+                        "File cannot be empty."
                 }
             )
 
@@ -892,24 +1034,20 @@ def create_upload_url(body):
                 400,
                 {
                     "success": False,
-                    "error": (
-                        "File exceeds the "
-                        "10 MB limit"
-                    )
+                    "error":
+                        "Maximum file size is 10 MB."
                 }
             )
 
     # --------------------------------------------------------
-    # Safe filename
+    # Make filename safe
     # --------------------------------------------------------
 
-    safe_filename = os.path.basename(
+    safe_filename = re.sub(
+        r"[^a-zA-Z0-9._-]",
+        "_",
         filename
     )
-
-    # --------------------------------------------------------
-    # Unique S3 key
-    # --------------------------------------------------------
 
     key = (
         f"{uuid.uuid4()}-"
@@ -917,22 +1055,26 @@ def create_upload_url(body):
     )
 
     logger.info(
-        "Generating presigned upload URL: %s",
+        "Creating presigned URL for: %s",
         key
     )
 
-    # --------------------------------------------------------
-    # Generate presigned URL
-    # --------------------------------------------------------
-
-    presigned_url = (
-        s3_client.generate_presigned_url(
+    upload_url = (
+        s3_client
+        .generate_presigned_url(
             ClientMethod="put_object",
+
             Params={
-                "Bucket": UPLOAD_BUCKET,
-                "Key": key,
-                "ContentType": "application/pdf"
+                "Bucket":
+                    UPLOAD_BUCKET,
+
+                "Key":
+                    key,
+
+                "ContentType":
+                    "application/pdf"
             },
+
             ExpiresIn=900
         )
     )
@@ -941,160 +1083,142 @@ def create_upload_url(body):
         200,
         {
             "success": True,
-            "uploadUrl": presigned_url,
+            "uploadUrl": upload_url,
             "key": key,
-            "filename": safe_filename,
+            "filename": filename,
             "expiresIn": 900
         }
     )
-
 
 # ============================================================
 # COMPLETE UPLOAD
 # ============================================================
 
-def complete_upload(body):
+def complete_upload(
+    body
+):
+    """
+    IMPORTANT:
 
-    try:
+    This function intentionally does NOT call:
 
-        key = body.get(
-            "key"
+        s3_client.head_object()
+
+    The browser already completed the direct S3 PUT.
+
+    The S3 ObjectCreated event independently invokes:
+
+        bedrock-doc-qa-kb-sync
+
+    That Lambda starts the Bedrock Knowledge Base
+    ingestion asynchronously.
+
+    Therefore this API must return immediately.
+    """
+
+    key = (
+        body.get(
+            "key",
+            ""
         )
+        .strip()
+    )
 
-        filename = body.get(
-            "filename"
+    filename = (
+        body.get(
+            "filename",
+            ""
         )
+        .strip()
+    )
 
-        if not key:
-
-            return response(
-                400,
-                {
-                    "success": False,
-                    "error": "Missing upload key"
-                }
-            )
-
-        # ----------------------------------------------------
-        # Verify object exists in S3
-        # ----------------------------------------------------
-
-        logger.info(
-            "Checking uploaded S3 object: %s",
-            key
-        )
-
-        head = s3_client.head_object(
-            Bucket=UPLOAD_BUCKET,
-            Key=key
-        )
-
-        file_size = head.get(
-            "ContentLength",
-            0
-        )
-
-        # ----------------------------------------------------
-        # Validate size
-        # ----------------------------------------------------
-
-        if file_size <= 0:
-
-            return response(
-                400,
-                {
-                    "success": False,
-                    "error": "Uploaded file is empty"
-                }
-            )
-
-        if file_size > MAX_UPLOAD_SIZE:
-
-            return response(
-                400,
-                {
-                    "success": False,
-                    "error": (
-                        "File exceeds the "
-                        "10 MB limit"
-                    )
-                }
-            )
-
-        logger.info(
-            "S3 upload confirmed successfully: "
-            "bucket=%s key=%s size=%s",
-            UPLOAD_BUCKET,
-            key,
-            file_size
-        )
-
-        # ----------------------------------------------------
-        # IMPORTANT:
-        #
-        # DO NOT START BEDROCK INGESTION HERE.
-        #
-        # S3 ObjectCreated event will automatically
-        # invoke the NEW Knowledge Base Sync Lambda.
-        # ----------------------------------------------------
-
-        # Clear cached RAG answers because a new document
-        # has been uploaded.
-        clear_rag_cache()
+    if not key:
 
         return response(
-            200,
-            {
-                "success": True,
-                "message": (
-                    "PDF uploaded successfully. "
-                    "Knowledge Base synchronization "
-                    "will start automatically."
-                ),
-                "key": key,
-                "filename": (
-                    filename
-                    or os.path.basename(key)
-                ),
-                "fileSize": file_size,
-                "sync": "pending"
-            }
-        )
-
-    except Exception as e:
-
-        logger.exception(
-            "Upload completion failed"
-        )
-
-        return response(
-            500,
+            400,
             {
                 "success": False,
-                "error": str(e)
+                "error":
+                    "Upload key is required."
             }
         )
 
+    if not key.lower().endswith(
+        ".pdf"
+    ):
+
+        return response(
+            400,
+            {
+                "success": False,
+                "error":
+                    "Only PDF uploads are supported."
+            }
+        )
+
+    logger.info(
+        "Upload confirmation received: key=%s filename=%s",
+        key,
+        filename
+    )
+
+    # --------------------------------------------------------
+    # DO NOT call head_object here.
+    #
+    # The S3 PUT already succeeded in the browser.
+    #
+    # S3 ObjectCreated will trigger the KB sync Lambda.
+    # --------------------------------------------------------
+
+    # New PDF means old RAG answers may be stale.
+    clear_rag_cache()
+
+    logger.info(
+        "Upload confirmation completed immediately."
+    )
+
+    logger.info(
+        "KB synchronization will happen asynchronously."
+    )
+
+    return response(
+        200,
+        {
+            "success": True,
+
+            "message":
+                "PDF uploaded successfully. "
+                "Knowledge Base synchronization "
+                "will start automatically in the background.",
+
+            "key":
+                key,
+
+            "filename":
+                filename or key.split("/")[-1],
+
+            "sync":
+                "pending"
+        }
+    )
 
 # ============================================================
-# GET UPLOAD STATUS
+# OPTIONAL UPLOAD STATUS
 # ============================================================
 
-def get_upload_status(body):
-
+def get_upload_status(
+    body
+):
     """
-    Kept for compatibility with the existing API.
+    Kept for compatibility.
 
-    The old upload Lambda no longer starts ingestion,
-    so this endpoint should only be used if an ingestion
-    job ID is supplied.
-
-    The actual ingestion job is now created by the NEW
-    S3-triggered Lambda.
+    The current frontend does NOT need to call this.
     """
 
-    ingestion_job_id = body.get(
-        "ingestionJobId"
+    ingestion_job_id = (
+        body.get(
+            "ingestionJobId"
+        )
     )
 
     if not ingestion_job_id:
@@ -1103,30 +1227,33 @@ def get_upload_status(body):
             400,
             {
                 "success": False,
-                "error": (
-                    "ingestionJobId is required. "
-                    "Ingestion is started asynchronously "
-                    "by the S3-triggered Lambda."
-                )
+                "error":
+                    "ingestionJobId is required."
             }
         )
 
     try:
 
-        # Import the client here because this Lambda
-        # no longer needs it for normal upload processing.
         bedrock_agent = boto3.client(
             "bedrock-agent",
-            region_name=AWS_REGION
+            region_name=REGION
         )
 
-        result = bedrock_agent.get_ingestion_job(
-            knowledgeBaseId=KNOWLEDGE_BASE_ID,
-            dataSourceId=KNOWLEDGE_BASE_DATA_SOURCE_ID,
-            ingestionJobId=ingestion_job_id
+        result = (
+            bedrock_agent
+            .get_ingestion_job(
+                knowledgeBaseId=
+                    KNOWLEDGE_BASE_ID,
+
+                dataSourceId=
+                    DATA_SOURCE_ID,
+
+                ingestionJobId=
+                    ingestion_job_id
+            )
         )
 
-        ingestion_job = result.get(
+        job = result.get(
             "ingestionJob",
             {}
         )
@@ -1135,18 +1262,12 @@ def get_upload_status(body):
             200,
             {
                 "success": True,
-                "ingestionJobId": ingestion_job_id,
-                "status": ingestion_job.get(
-                    "status"
-                ),
-                "statistics": ingestion_job.get(
-                    "statistics",
-                    {}
-                ),
-                "failureReasons": ingestion_job.get(
-                    "failureReasons",
-                    []
-                )
+                "status":
+                    job.get(
+                        "status"
+                    ),
+                "job":
+                    job
             }
         )
 
@@ -1164,46 +1285,45 @@ def get_upload_status(body):
             }
         )
 
-
 # ============================================================
 # DATA SOURCE INFO
 # ============================================================
 
 def get_data_source_info():
-
     try:
 
         bedrock_agent = boto3.client(
             "bedrock-agent",
-            region_name=AWS_REGION
+            region_name=REGION
         )
 
         result = (
-            bedrock_agent.get_data_source(
-                knowledgeBaseId=KNOWLEDGE_BASE_ID,
-                dataSourceId=(
-                    KNOWLEDGE_BASE_DATA_SOURCE_ID
-                )
-            )
-        )
+            bedrock_agent
+            .get_data_source(
+                knowledgeBaseId=
+                    KNOWLEDGE_BASE_ID,
 
-        data_source = result.get(
-            "dataSource",
-            {}
+                dataSourceId=
+                    DATA_SOURCE_ID
+            )
         )
 
         return response(
             200,
             {
                 "success": True,
-                "dataSource": data_source
+                "dataSource":
+                    result.get(
+                        "dataSource",
+                        {}
+                    )
             }
         )
 
     except Exception as e:
 
         logger.exception(
-            "Failed to get data source info"
+            "Failed to get data source"
         )
 
         return response(
@@ -1214,15 +1334,17 @@ def get_data_source_info():
             }
         )
 
-
 # ============================================================
-# MAIN LAMBDA HANDLER
+# MAIN HANDLER
 # ============================================================
 
-def lambda_handler(event, context):
+def lambda_handler(
+    event,
+    context
+):
 
     logger.info(
-        "Received event: %s",
+        "Lambda event received: %s",
         json.dumps(
             event,
             default=str
@@ -1231,66 +1353,34 @@ def lambda_handler(event, context):
 
     try:
 
-        # ====================================================
+        # ----------------------------------------------------
         # HTTP METHOD
-        # ====================================================
+        # ----------------------------------------------------
 
-        request_context = event.get(
-            "requestContext",
-            {}
-        )
-
-        http_info = request_context.get(
-            "http",
-            {}
-        )
-
-        method = (
-            http_info.get("method")
-            or event.get(
+        http_method = (
+            event.get(
                 "httpMethod"
             )
-            or "GET"
+            or
+            event.get(
+                "requestContext",
+                {}
+            )
+            .get(
+                "http",
+                {}
+            )
+            .get(
+                "method"
+            )
+            or ""
         ).upper()
 
-        # ====================================================
-        # PATH
-        # ====================================================
+        # ----------------------------------------------------
+        # OPTIONS / CORS
+        # ----------------------------------------------------
 
-        path = (
-            event.get(
-                "rawPath"
-            )
-            or event.get(
-                "path"
-            )
-            or "/"
-        )
-
-        # Remove stage prefix if present
-        if path.startswith("/dev/"):
-
-            path = path[4:]
-
-        elif path == "/dev":
-
-            path = "/"
-
-        if not path.startswith("/"):
-
-            path = "/" + path
-
-        logger.info(
-            "Request: %s %s",
-            method,
-            path
-        )
-
-        # ====================================================
-        # OPTIONS
-        # ====================================================
-
-        if method == "OPTIONS":
+        if http_method == "OPTIONS":
 
             return response(
                 200,
@@ -1299,25 +1389,41 @@ def lambda_handler(event, context):
                 }
             )
 
-        # ====================================================
-        # REQUEST BODY
-        # ====================================================
+        # ----------------------------------------------------
+        # PATH
+        # ----------------------------------------------------
 
-        body = event.get(
+        path = (
+            event.get(
+                "path"
+            )
+            or
+            event.get(
+                "rawPath"
+            )
+            or
+            ""
+        )
+
+        # ----------------------------------------------------
+        # BODY
+        # ----------------------------------------------------
+
+        raw_body = event.get(
             "body"
         )
 
-        if body:
+        if raw_body:
 
             if isinstance(
-                body,
+                raw_body,
                 str
             ):
 
                 try:
 
                     body = json.loads(
-                        body
+                        raw_body
                     )
 
                 except json.JSONDecodeError:
@@ -1326,58 +1432,71 @@ def lambda_handler(event, context):
                         400,
                         {
                             "success": False,
-                            "error": (
-                                "Invalid JSON body"
-                            )
+                            "error":
+                                "Invalid JSON body."
                         }
                     )
 
-        elif isinstance(
-            body,
-            dict
-        ):
+            elif isinstance(
+                raw_body,
+                dict
+            ):
 
-            body = body
+                body = raw_body
+
+            else:
+
+                body = {}
 
         else:
 
             body = {}
 
-        # ====================================================
-        # POST /query
-        # ====================================================
+        # ----------------------------------------------------
+        # QUERY
+        # ----------------------------------------------------
 
         if (
-            method == "POST"
-            and path == "/query"
+            path.endswith("/query")
+            and
+            http_method == "POST"
         ):
 
             return handle_query(
                 body
             )
 
-        # ====================================================
-        # GET /query/history
-        # ====================================================
+        # ----------------------------------------------------
+        # HISTORY
+        # ----------------------------------------------------
 
         if (
-            method == "GET"
-            and path == "/query/history"
+            path.endswith(
+                "/query/history"
+            )
+            and
+            http_method == "GET"
         ):
 
             return get_history()
 
-        # ====================================================
-        # POST /upload
-        # ====================================================
+        # ----------------------------------------------------
+        # UPLOAD
+        # ----------------------------------------------------
 
         if (
-            method == "POST"
-            and path == "/upload"
+            path.endswith("/upload")
+            and
+            http_method == "POST"
         ):
 
-            action = body.get(
-                "action"
+            action = (
+                body.get(
+                    "action",
+                    "create"
+                )
+                .strip()
+                .lower()
             )
 
             if action == "create":
@@ -1402,36 +1521,39 @@ def lambda_handler(event, context):
                 400,
                 {
                     "success": False,
-                    "error": (
-                        "Invalid upload action. "
-                        "Use create, complete, or status."
-                    )
+                    "error":
+                        f"Unknown upload action: {action}"
                 }
             )
 
-        # ====================================================
-        # GET /upload/data-source
-        # ====================================================
+        # ----------------------------------------------------
+        # DATA SOURCE
+        # ----------------------------------------------------
 
         if (
-            method == "GET"
-            and path == "/upload/data-source"
+            path.endswith(
+                "/data-source"
+            )
+            and
+            http_method == "GET"
         ):
 
             return get_data_source_info()
 
-        # ====================================================
-        # NOT FOUND
-        # ====================================================
+        # ----------------------------------------------------
+        # UNKNOWN ROUTE
+        # ----------------------------------------------------
 
         return response(
             404,
             {
                 "success": False,
-                "error": (
-                    f"Route not found: "
-                    f"{method} {path}"
-                )
+                "error":
+                    "Route not found.",
+                "path":
+                    path,
+                "method":
+                    http_method
             }
         )
 
