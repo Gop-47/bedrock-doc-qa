@@ -4,7 +4,15 @@ const API_URL =
 const HISTORY_API_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query/history";
 
+
 console.log("NOXORA SCRIPT LOADED");
+
+
+/* =====================================================
+   STATE
+===================================================== */
+
+let selectedMode = "rag";
 
 
 /* =====================================================
@@ -19,6 +27,9 @@ const askButton =
 
 const loadingCard =
     document.getElementById("loadingCard");
+
+const loadingText =
+    document.getElementById("loadingText");
 
 const answerSection =
     document.getElementById("answerSection");
@@ -49,6 +60,17 @@ const errorMessage =
 
 
 /* =====================================================
+   MODE SELECTOR
+===================================================== */
+
+const modeToggle =
+    document.getElementById("modeToggle");
+
+const modeOptions =
+    document.querySelectorAll(".mode-option");
+
+
+/* =====================================================
    HISTORY ELEMENTS
 ===================================================== */
 
@@ -74,6 +96,126 @@ hideElement(answerSection);
 hideElement(sourcesSection);
 hideElement(errorCard);
 hideElement(historySection);
+
+setSelectedMode("rag");
+
+
+/* =====================================================
+   MODE SELECTION
+===================================================== */
+
+if (modeOptions.length > 0) {
+
+    modeOptions.forEach(
+        function (option) {
+
+            option.addEventListener(
+                "click",
+                function () {
+
+                    const requestedMode =
+                        option.dataset.mode || "rag";
+
+                    setSelectedMode(
+                        requestedMode
+                    );
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
+/* =====================================================
+   SET SELECTED MODE
+===================================================== */
+
+function setSelectedMode(mode) {
+
+    if (
+        mode !== "rag" &&
+        mode !== "direct"
+    ) {
+
+        mode = "rag";
+
+    }
+
+
+    selectedMode = mode;
+
+
+    modeOptions.forEach(
+        function (option) {
+
+            const isActive =
+                option.dataset.mode === selectedMode;
+
+
+            option.classList.toggle(
+                "active",
+                isActive
+            );
+
+
+            option.setAttribute(
+                "aria-pressed",
+                isActive ? "true" : "false"
+            );
+
+        }
+    );
+
+
+    updateModeUI();
+
+}
+
+
+/* =====================================================
+   UPDATE MODE UI
+===================================================== */
+
+function updateModeUI() {
+
+    if (!questionInput) {
+        return;
+    }
+
+
+    if (selectedMode === "direct") {
+
+        questionInput.placeholder =
+            "Ask anything you want Claude to explain...";
+
+
+        if (loadingText) {
+
+            loadingText.textContent =
+                "Generating a direct AI answer...";
+
+        }
+
+
+    } else {
+
+        questionInput.placeholder =
+            "Ask something about your documents...";
+
+
+        if (loadingText) {
+
+            loadingText.textContent =
+                "Searching your knowledge base...";
+
+        }
+
+    }
+
+}
 
 
 /* =====================================================
@@ -190,8 +332,14 @@ async function askQuestion() {
 
     hideElement(errorCard);
     hideElement(historySection);
+    hideElement(answerSection);
+    hideElement(sourcesSection);
+
 
     showElement(loadingCard);
+
+
+    updateModeUI();
 
 
     if (askButton) {
@@ -208,6 +356,11 @@ async function askQuestion() {
 
         console.log(
             "Sending request to Noxora API..."
+        );
+
+        console.log(
+            "Requested mode:",
+            selectedMode
         );
 
 
@@ -228,7 +381,7 @@ async function askQuestion() {
                             question,
 
                         mode:
-                            "rag"
+                            selectedMode
 
                     })
 
@@ -256,7 +409,8 @@ async function askQuestion() {
         );
 
 
-        let result = data;
+        let result =
+            data;
 
 
         if (data.body) {
@@ -284,6 +438,26 @@ async function askQuestion() {
 
             throw new Error(
                 result.error
+            );
+
+        }
+
+
+        /*
+         * Lambda is the source of truth.
+         *
+         * If Direct AI was disabled on Lambda,
+         * Lambda may return mode="rag" even though
+         * the frontend requested direct.
+         */
+
+        if (
+            result.mode === "rag" ||
+            result.mode === "direct"
+        ) {
+
+            setSelectedMode(
+                result.mode
             );
 
         }
@@ -350,27 +524,48 @@ function displayAnswer(data) {
     );
 
 
+    const actualMode =
+        String(
+            data.mode ||
+            selectedMode ||
+            "rag"
+        ).toLowerCase();
+
+
+    /* -----------------------------------------
+       CACHE / MODE STATUS
+    ----------------------------------------- */
+
     if (cacheStatus) {
 
         if (
-            data.cache ===
-            "hit"
+            actualMode === "direct"
         ) {
 
             cacheStatus.textContent =
-                "CACHE HIT";
+                "DIRECT AI";
+
+            cacheStatus.className =
+                "cache-status direct-status";
+
+
+        } else if (
+            data.cache === "hit"
+        ) {
+
+            cacheStatus.textContent =
+                "RAG · CACHE HIT";
 
             cacheStatus.className =
                 "cache-status cache-hit";
 
 
         } else if (
-            data.cache ===
-            "miss"
+            data.cache === "miss"
         ) {
 
             cacheStatus.textContent =
-                "CACHE MISS";
+                "RAG · CACHE MISS";
 
             cacheStatus.className =
                 "cache-status cache-miss";
@@ -379,19 +574,47 @@ function displayAnswer(data) {
         } else {
 
             cacheStatus.textContent =
-                "";
+                "RAG";
 
             cacheStatus.className =
-                "cache-status";
+                "cache-status rag-status";
 
         }
 
     }
 
 
-    displaySources(
-        data.citations || []
-    );
+    /* -----------------------------------------
+       SOURCES
+    ----------------------------------------- */
+
+    if (actualMode === "rag") {
+
+        displaySources(
+            data.citations || []
+        );
+
+    } else {
+
+        hideElement(
+            sourcesSection
+        );
+
+        if (sourcesList) {
+
+            sourcesList.innerHTML =
+                "";
+
+        }
+
+        if (sourcesCount) {
+
+            sourcesCount.textContent =
+                "";
+
+        }
+
+    }
 
 }
 
@@ -488,7 +711,7 @@ function displaySources(
             uniqueSources.length === 1
                 ? "1 source"
                 : uniqueSources.length +
-                " sources";
+                  " sources";
 
     }
 
@@ -642,11 +865,6 @@ function displaySources(
             expandButton.addEventListener(
                 "click",
                 function (event) {
-
-                    /*
-                     * Prevent the source click from
-                     * affecting parent interactions.
-                     */
 
                     event.stopPropagation();
 
@@ -919,8 +1137,7 @@ function renderHistory(
 
     history.forEach(
         function (
-            item,
-            index
+            item
         ) {
 
             const historyCard =
@@ -932,10 +1149,6 @@ function renderHistory(
                 "history-card";
 
 
-            /*
-             * Make the card clickable.
-             */
-
             historyCard.setAttribute(
                 "role",
                 "button"
@@ -945,7 +1158,6 @@ function renderHistory(
                 "tabindex",
                 "0"
             );
-
 
             historyCard.setAttribute(
                 "aria-label",
@@ -1185,7 +1397,7 @@ function renderHistory(
 
 
             /* -----------------------------------------
-               CLICK HISTORY ENTRY
+               CLICK
             ----------------------------------------- */
 
             historyCard.addEventListener(
@@ -1201,7 +1413,7 @@ function renderHistory(
 
 
             /* -----------------------------------------
-               KEYBOARD ACCESS
+               KEYBOARD
             ----------------------------------------- */
 
             historyCard.addEventListener(
@@ -1294,6 +1506,15 @@ function openHistoryEntry(
 
 
     /* -----------------------------------------
+       RESTORE MODE
+    ----------------------------------------- */
+
+    setSelectedMode(
+        mode
+    );
+
+
+    /* -----------------------------------------
        RESTORE ANSWER
     ----------------------------------------- */
 
@@ -1311,17 +1532,10 @@ function openHistoryEntry(
 
 
     /* -----------------------------------------
-       RESTORE MODE / CACHE STATUS
+       RESTORE STATUS
     ----------------------------------------- */
 
     if (cacheStatus) {
-
-        /*
-         * History doesn't store whether the
-         * original request was a cache hit.
-         *
-         * Therefore we clear the cache badge.
-         */
 
         cacheStatus.textContent =
             mode === "rag"
@@ -1382,7 +1596,7 @@ function openHistoryEntry(
 
 
     /* -----------------------------------------
-       CLEAR OLD ERROR
+       CLEAR ERROR
     ----------------------------------------- */
 
     hideElement(
