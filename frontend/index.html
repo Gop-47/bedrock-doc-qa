@@ -2,248 +2,432 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Noxora — AI Knowledge Assistant</title>
-
-    <meta name="description" content="Noxora is an AI knowledge assistant that answers questions from your documents.">
+    <title>
+        Noxora — AI Knowledge Assistant
+    </title>
 
     <link rel="stylesheet" href="style.css">
+
 </head>
+
 
 <body>
 
-    <!-- Background -->
-    <div class="background-glow glow-one"></div>
-    <div class="background-glow glow-two"></div>
 
-    <!-- App -->
-    <div class="app">
+    <!-- =====================================================
+     HEADER
+===================================================== -->
 
-        <!-- Header -->
-        <header class="header">
+    <header class="header">
 
-            <div class="brand">
-                <div class="brand-icon">✦</div>
+        <div class="container header-inner">
 
-                <div>
-                    <div class="brand-name">NOXORA</div>
-                    <div class="brand-subtitle">AI Knowledge Assistant</div>
+
+            <!-- LOGO -->
+
+            <div class="logo">
+
+                <div class="logo-mark">
+                    N
                 </div>
+
+                <div class="logo-text">
+
+                    <div class="logo-title">
+                        NOXORA
+                    </div>
+
+                    <div class="logo-subtitle">
+                        AI Knowledge Assistant
+                    </div>
+
+                </div>
+
             </div>
 
-            <div class="status">
-                <span class="status-dot"></span>
-                <span>System Online</span>
+
+            <!-- HEADER ACTIONS -->
+
+            <div class="header-actions">
+
+
+                <!-- HISTORY BUTTON -->
+
+                <button id="historyButton" class="history-button" type="button">
+                    ◷ History
+                </button>
+
+
+                <!-- SYSTEM STATUS -->
+
+                <div class="status">
+
+                    <span class="status-dot"></span>
+
+                    System Online
+
+                </div>
+
+
             </div>
 
-        </header>
+
+        </div>
+
+    </header>
 
 
-        <!-- Main -->
-        <main class="main">
 
-            <!-- Hero -->
+    <!-- =====================================================
+     MAIN
+===================================================== -->
+
+    <main>
+
+        <div class="container">
+
+
+            <!-- =================================================
+             HERO
+        ================================================== -->
+
             <section class="hero">
 
-                <div class="eyebrow">
-                    <span>✦</span>
-                    DOCUMENT INTELLIGENCE
+                <div class="hero-badge">
+                    ✦ AI KNOWLEDGE ASSISTANT
                 </div>
 
+
                 <h1>
-                    Ask your knowledge.<br>
-                    <span>Get intelligent answers.</span>
+
+                    Ask your knowledge.
+
+                    <br>
+
+                    Get intelligent answers.
+
                 </h1>
 
-                <p class="hero-description">
-                    Ask questions about your documents and get
-                    accurate answers powered by AI and retrieval.
+
+                <p>
+
+                    Ask questions about your documents and
+                    get AI-powered answers with source citations.
+
                 </p>
 
             </section>
 
 
-            <!-- Query Card -->
+
+            <!-- =================================================
+             QUERY CARD
+        ================================================== -->
+
             <section class="query-card">
+
 
                 <div class="query-header">
 
-                    <div>
-                        <div class="query-title">
-                            Ask Noxora
-                        </div>
-
-                        <div class="query-subtitle">
-                            Ask anything about your documents
-                        </div>
+                    <div class="query-title">
+                        Ask a question
                     </div>
+
 
                     <div class="rag-badge">
-                        <span>✦</span>
-                        RAG
+                        RAG ENABLED
                     </div>
 
                 </div>
 
 
-                <div class="input-wrapper">
 
-                    <textarea id="questionInput" placeholder="What would you like to know?" rows="3"></textarea>
+                <textarea id="questionInput" placeholder="Ask something about your documents..."
+                    autocomplete="off"></textarea>
 
-                    <div class="input-footer">
 
-                        <div class="input-hint">
-                            Press <kbd>Enter</kbd> to ask
-                        </div>
 
-                        <button id="askButton" class="ask-button" type="button">
-                            <span>Ask Noxora</span>
-                            <span class="button-icon">↗</span>
-                        </button>
+                <div class="query-footer">
+
+
+                    <div class="input-hint">
+
+                        Press Enter to ask
+                        ·
+                        Shift + Enter for new line
 
                     </div>
 
-                </div>
 
-            </section>
+                    <button id="askButton" class="ask-button" type="button">
 
+                        Ask Noxora
 
-            <!-- Feature Pills -->
-            <section class="features">
-
-                <div class="feature">
-                    <span class="feature-icon">⚡</span>
-                    <span>AI Powered</span>
-                </div>
-
-                <div class="feature">
-                    <span class="feature-icon">◈</span>
-                    <span>Knowledge Base</span>
-                </div>
-
-                <div class="feature">
-                    <span class="feature-icon">◉</span>
-                    <span>Smart Caching</span>
-                </div>
-
-                <div class="feature">
-                    <span class="feature-icon">✓</span>
-                    <span>Source Citations</span>
-                </div>
-
-            </section>
-
-
-            <!-- Loading -->
-            <section id="loadingCard" class="loading-card hidden">
-
-                <div class="loading-spinner"></div>
-
-                <div>
-                    <div class="loading-title">
-                        Noxora is thinking...
-                    </div>
-
-                    <div class="loading-subtitle">
-                        Searching your knowledge base
-                    </div>
-                </div>
-
-            </section>
-
-
-            <!-- Answer -->
-            <section id="answerSection" class="answer-section hidden">
-
-                <div class="section-heading">
-
-                    <div>
-                        <div class="section-label">
-                            RESPONSE
-                        </div>
-
-                        <div class="section-title">
-                            Noxora's Answer
-                        </div>
-                    </div>
-
-                    <button id="copyButton" class="copy-button" type="button">
-                        Copy
                     </button>
 
-                </div>
-
-
-                <div class="answer-card">
-
-                    <div id="answerText" class="answer-text"></div>
-
-                    <div id="cacheStatus" class="cache-status"></div>
 
                 </div>
+
 
             </section>
 
 
-            <!-- Sources -->
+
+            <!-- =================================================
+             FEATURES
+        ================================================== -->
+
+            <div class="features">
+
+
+                <div class="feature-pill">
+                    ✦ AI Powered
+                </div>
+
+
+                <div class="feature-pill">
+                    ◈ Knowledge Base
+                </div>
+
+
+                <div class="feature-pill">
+                    ⚡ Smart Caching
+                </div>
+
+
+                <div class="feature-pill">
+                    ◉ Source Citations
+                </div>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+             LOADING
+        ================================================== -->
+
+            <div id="loadingCard" class="loading-card hidden">
+
+                <div class="spinner"></div>
+
+
+                <div class="loading-text">
+
+                    Searching your knowledge base...
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+             ERROR
+        ================================================== -->
+
+            <div id="errorCard" class="error-card hidden">
+
+                <div id="errorMessage"></div>
+
+            </div>
+
+
+
+            <!-- =================================================
+             ANSWER
+        ================================================== -->
+
+            <section id="answerSection" class="answer-section hidden">
+
+
+                <div class="result-card">
+
+
+                    <!-- RESULT HEADER -->
+
+                    <div class="result-header">
+
+
+                        <div class="result-title">
+
+                            <div class="result-icon">
+                                ✦
+                            </div>
+
+                            <span>
+                                Answer
+                            </span>
+
+                        </div>
+
+
+                        <div id="cacheStatus" class="cache-status"></div>
+
+
+                    </div>
+
+
+
+                    <!-- ANSWER CONTENT -->
+
+                    <div class="answer-content">
+
+
+                        <div id="answerText"></div>
+
+
+                        <button id="copyButton" class="copy-button" type="button">
+
+                            Copy answer
+
+                        </button>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+             SOURCES
+        ================================================== -->
+
             <section id="sourcesSection" class="sources-section hidden">
 
-                <div class="section-heading">
+
+                <div class="sources-header">
+
+
+                    <div class="sources-title">
+
+                        Knowledge Base Sources
+
+                    </div>
+
+
+                    <div id="sourcesCount" class="sources-count"></div>
+
+
+                </div>
+
+
+                <div id="sourcesList"></div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+             HISTORY SECTION
+        ================================================== -->
+
+            <section id="historySection" class="history-section hidden">
+
+
+                <div class="history-header">
+
 
                     <div>
-                        <div class="section-label">
-                            KNOWLEDGE BASE
+
+                        <div class="history-title">
+
+                            Query History
+
                         </div>
 
-                        <div class="section-title">
-                            Sources
+
+                        <div class="history-subtitle">
+
+                            Your recent questions and answers
+
                         </div>
+
                     </div>
+
+
+                    <button id="closeHistoryButton" class="history-close-button" type="button">
+
+                        Close
+
+                    </button>
+
 
                 </div>
 
-                <div id="sourcesList" class="sources-list"></div>
+
+                <div id="historyList">
+
+                    <!-- History items will be inserted here -->
+
+                </div>
+
 
             </section>
 
 
-            <!-- Error -->
-            <section id="errorCard" class="error-card hidden">
+        </div>
 
-                <div class="error-icon">!</div>
-
-                <div>
-                    <div class="error-title">
-                        Something went wrong
-                    </div>
-
-                    <div id="errorMessage" class="error-message"></div>
-                </div>
-
-            </section>
-
-        </main>
+    </main>
 
 
-        <!-- Footer -->
-        <footer class="footer">
 
-            <div>
-                Noxora · AI Knowledge Assistant
-            </div>
+    <!-- =====================================================
+     FOOTER
+===================================================== -->
 
-            <div class="footer-tech">
-                AWS · Bedrock · Valkey · DynamoDB
-            </div>
+    <footer class="footer">
 
-        </footer>
+        <div class="container">
 
-    </div>
+            Powered by
 
+            <strong>
+                AWS Bedrock
+            </strong>
+
+            ·
+
+            <strong>
+                Knowledge Bases
+            </strong>
+
+            ·
+
+            <strong>
+                Valkey
+            </strong>
+
+            ·
+
+            <strong>
+                DynamoDB
+            </strong>
+
+        </div>
+
+    </footer>
+
+
+
+    <!-- =====================================================
+     JAVASCRIPT
+===================================================== -->
 
     <script src="script.js"></script>
+
 
 </body>
 
