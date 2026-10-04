@@ -1,4 +1,3 @@
-```javascript
 // ============================================================
 // NOXORA — AI KNOWLEDGE ASSISTANT
 // ============================================================
@@ -1849,4 +1848,3 @@ function copyAnswer() {
 
 window.copyAnswer =
     copyAnswer;
-```
