@@ -1,11 +1,6 @@
 const API_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
 
-
-// =========================
-// DOM elements
-// =========================
-
 const questionInput = document.getElementById("questionInput");
 const askButton = document.getElementById("askButton");
 
@@ -15,103 +10,93 @@ const answerSection = document.getElementById("answerSection");
 const answerText = document.getElementById("answerText");
 const cacheStatus = document.getElementById("cacheStatus");
 
+const copyButton = document.getElementById("copyButton");
+
 const sourcesSection = document.getElementById("sourcesSection");
 const sourcesList = document.getElementById("sourcesList");
+const sourcesCount = document.getElementById("sourcesCount");
 
 const errorCard = document.getElementById("errorCard");
 const errorMessage = document.getElementById("errorMessage");
 
-const copyButton = document.getElementById("copyButton");
+
+/* =========================
+   INITIAL STATE
+========================= */
+
+hideElement(loadingCard);
+hideElement(answerSection);
+hideElement(sourcesSection);
+hideElement(errorCard);
 
 
-// =========================
-// Ask Noxora
-// =========================
+/* =========================
+   ASK QUESTION
+========================= */
 
-async function askNoxora() {
+async function askQuestion() {
 
     const question = questionInput.value.trim();
 
     if (!question) {
-        questionInput.focus();
+        showError("Please enter a question.");
         return;
     }
 
-
-    // Reset UI
     hideElement(errorCard);
     hideElement(answerSection);
     hideElement(sourcesSection);
 
     showElement(loadingCard);
 
-
-    // Disable button
     askButton.disabled = true;
-
-    const buttonText =
-        askButton.querySelector("span:first-child");
-
-    if (buttonText) {
-        buttonText.textContent = "Thinking...";
-    }
-
+    askButton.textContent = "Thinking...";
 
     try {
 
-        const response = await fetch(
-            API_URL,
-            {
-                method: "POST",
+        const response = await fetch(API_URL, {
+            method: "POST",
 
-                headers: {
-                    "Content-Type": "application/json"
-                },
+            headers: {
+                "Content-Type": "application/json"
+            },
 
-                body: JSON.stringify({
-                    question: question,
-                    mode: "rag"
-                })
-            }
-        );
+            body: JSON.stringify({
+                question: question,
+                mode: "rag"
+            })
+        });
 
 
-        // Check HTTP status
         if (!response.ok) {
 
             throw new Error(
                 "API request failed with status " +
                 response.status
             );
+
         }
 
 
-        // Parse response
         const data = await response.json();
 
+        console.log("Noxora API response:", data);
 
-        /*
-         * API Gateway Lambda Proxy integration
-         * returns:
-         *
-         * {
-         *   statusCode: 200,
-         *   headers: {...},
-         *   body: "..."
-         * }
-         *
-         * But depending on the API configuration,
-         * the response may already be the body.
-         */
+
+        /* =========================
+           HANDLE LAMBDA PROXY BODY
+        ========================= */
 
         let result = data;
 
-
-        if (typeof data.body === "string") {
+        if (data.body) {
 
             try {
 
-                result = JSON.parse(data.body);
+                result =
+                    typeof data.body === "string"
+                        ? JSON.parse(data.body)
+                        : data.body;
 
             } catch (error) {
 
@@ -120,34 +105,27 @@ async function askNoxora() {
                     error
                 );
 
-                throw new Error(
-                    "Invalid response received from API"
-                );
             }
         }
 
 
-        // Handle API error
         if (result.error) {
-
-            throw new Error(
-                result.error
-            );
+            throw new Error(result.error);
         }
 
 
-        // Display answer
         displayAnswer(result);
 
     } catch (error) {
 
         console.error(
-            "Noxora error:",
+            "Noxora request error:",
             error
         );
 
         showError(
-            error.message
+            error.message ||
+            "Something went wrong. Please try again."
         );
 
     } finally {
@@ -155,77 +133,72 @@ async function askNoxora() {
         hideElement(loadingCard);
 
         askButton.disabled = false;
+        askButton.textContent = "Ask Noxora";
 
-
-        if (buttonText) {
-            buttonText.textContent = "Ask Noxora";
-        }
     }
 }
 
 
-// =========================
-// Display answer
-// =========================
+/* =========================
+   DISPLAY ANSWER
+========================= */
 
-function displayAnswer(result) {
+function displayAnswer(data) {
 
-    // Answer
     answerText.textContent =
-        result.answer ||
-        "No answer was returned.";
+        data.answer ||
+        "No answer returned.";
 
-
-    // Cache status
-    cacheStatus.className =
-        "cache-status";
-
-
-    if (result.cache === "hit") {
-
-        cacheStatus.textContent =
-            "⚡ Cached response";
-
-        cacheStatus.classList.add(
-            "cache-hit"
-        );
-
-    } else {
-
-        cacheStatus.textContent =
-            "✦ Generated with RAG";
-
-        cacheStatus.classList.add(
-            "cache-miss"
-        );
-    }
-
-
-    // Show answer
     showElement(answerSection);
 
 
-    // Show sources
+    /* =========================
+       CACHE STATUS
+    ========================= */
+
+    if (data.cache === "hit") {
+
+        cacheStatus.textContent = "CACHE HIT";
+
+        cacheStatus.className =
+            "cache-status cache-hit";
+
+    } else if (data.cache === "miss") {
+
+        cacheStatus.textContent = "CACHE MISS";
+
+        cacheStatus.className =
+            "cache-status cache-miss";
+
+    } else {
+
+        cacheStatus.textContent = "";
+
+        cacheStatus.className =
+            "cache-status";
+
+    }
+
+
+    /* =========================
+       SOURCES
+    ========================= */
+
     displaySources(
-        result.citations
+        data.citations || []
     );
-
-
-    // Scroll to answer
-    answerSection.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-    });
 }
 
 
-// =========================
-// Display sources
-// =========================
+/* =========================
+   DISPLAY SOURCES
+========================= */
 
 function displaySources(citations) {
 
     sourcesList.innerHTML = "";
+
+    sourcesCount.textContent = "";
 
 
     if (
@@ -233,26 +206,106 @@ function displaySources(citations) {
         citations.length === 0
     ) {
 
-        hideElement(
-            sourcesSection
-        );
+        hideElement(sourcesSection);
 
         return;
+
     }
 
 
-    citations.forEach(
+    /*
+     * Remove duplicate documents.
+     *
+     * Bedrock can return multiple chunks
+     * from the same PDF. We only want to
+     * display each document once.
+     */
+
+    const uniqueSources = [];
+
+    const seenSources = new Set();
+
+
+    citations.forEach((citation) => {
+
+        const source =
+            citation.source ||
+            "Unknown source";
+
+
+        let normalizedSource =
+            source.trim().toLowerCase();
+
+
+        /*
+         * Remove query parameters from URLs
+         * so the same document is recognized
+         * as the same source.
+         */
+
+        try {
+
+            const url =
+                new URL(source);
+
+            normalizedSource =
+                (
+                    url.origin +
+                    url.pathname
+                ).toLowerCase();
+
+        } catch (error) {
+
+            // Keep normalized string
+        }
+
+
+        if (
+            !seenSources.has(
+                normalizedSource
+            )
+        ) {
+
+            seenSources.add(
+                normalizedSource
+            );
+
+            uniqueSources.push(
+                citation
+            );
+
+        }
+
+    });
+
+
+    showElement(sourcesSection);
+
+
+    sourcesCount.textContent =
+        uniqueSources.length === 1
+            ? "1 source"
+            : uniqueSources.length + " sources";
+
+
+    /* =========================
+       CREATE SOURCE CARDS
+    ========================= */
+
+    uniqueSources.forEach(
         (citation, index) => {
 
-            // Main card
-            const card =
+            const sourceCard =
                 document.createElement("div");
 
-            card.className =
+            sourceCard.className =
                 "source-card";
 
 
-            // Icon
+            /* =========================
+               ICON
+            ========================= */
+
             const icon =
                 document.createElement("div");
 
@@ -263,7 +316,10 @@ function displaySources(citations) {
                 "📄";
 
 
-            // Content
+            /* =========================
+               CONTENT
+            ========================= */
+
             const content =
                 document.createElement("div");
 
@@ -271,69 +327,76 @@ function displaySources(citations) {
                 "source-content";
 
 
-            // Source number
-            const sourceLabel =
+            /* =========================
+               LABEL
+            ========================= */
+
+            const label =
                 document.createElement("div");
 
-            sourceLabel.className =
+            label.className =
                 "source-label";
 
-            sourceLabel.textContent =
-                `Source ${index + 1}`;
+            label.textContent =
+                "Source " +
+                (index + 1);
 
 
-            // Get source
-            let sourceName =
-                citation.source ||
-                `Document ${index + 1}`;
+            /* =========================
+               FILE NAME
+            ========================= */
 
-
-            /*
-             * Convert:
-             *
-             * https://example.com/file.pdf
-             *
-             * into:
-             *
-             * file.pdf
-             */
-
-            try {
-
-                const url =
-                    new URL(sourceName);
-
-                const filename =
-                    url.pathname
-                        .split("/")
-                        .pop();
-
-                if (filename) {
-
-                    sourceName =
-                        decodeURIComponent(
-                            filename
-                        );
-                }
-
-            } catch (error) {
-
-                // Keep original source
-            }
-
-
-            // Document name
             const name =
                 document.createElement("div");
 
             name.className =
                 "source-name";
 
+
+            const sourceUrl =
+                citation.source ||
+                "Unknown source";
+
+
+            let fileName =
+                sourceUrl;
+
+
+            try {
+
+                const url =
+                    new URL(sourceUrl);
+
+                const pathname =
+                    decodeURIComponent(
+                        url.pathname
+                    );
+
+                fileName =
+                    pathname
+                        .split("/")
+                        .pop() ||
+                    sourceUrl;
+
+            } catch (error) {
+
+                fileName =
+                    sourceUrl;
+
+            }
+
+
             name.textContent =
-                sourceName;
+                fileName;
+
+            name.title =
+                sourceUrl;
 
 
-            // Description
+            /* =========================
+               DESCRIPTION
+            ========================= */
+
             const description =
                 document.createElement("div");
 
@@ -341,21 +404,13 @@ function displaySources(citations) {
                 "source-description";
 
             description.textContent =
-                "Retrieved from Knowledge Base";
+                "Retrieved from your Knowledge Base";
 
 
-            // Expand button
-            const expandButton =
-                document.createElement("button");
+            /* =========================
+               SOURCE TEXT
+            ========================= */
 
-            expandButton.className =
-                "source-expand";
-
-            expandButton.textContent =
-                "View source";
-
-
-            // Source text
             const sourceText =
                 document.createElement("div");
 
@@ -364,10 +419,26 @@ function displaySources(citations) {
 
             sourceText.textContent =
                 citation.text ||
-                "No source content available.";
+                "No source text available.";
 
 
-            // Expand / collapse
+            /* =========================
+               EXPAND BUTTON
+            ========================= */
+
+            const expandButton =
+                document.createElement("button");
+
+            expandButton.className =
+                "source-expand";
+
+            expandButton.type =
+                "button";
+
+            expandButton.textContent =
+                "View source";
+
+
             expandButton.addEventListener(
                 "click",
                 () => {
@@ -395,14 +466,19 @@ function displaySources(citations) {
 
                         expandButton.textContent =
                             "View source";
+
                     }
+
                 }
             );
 
 
-            // Build card
+            /* =========================
+               BUILD
+            ========================= */
+
             content.appendChild(
-                sourceLabel
+                label
             );
 
             content.appendChild(
@@ -414,90 +490,62 @@ function displaySources(citations) {
             );
 
             content.appendChild(
-                expandButton
-            );
-
-            content.appendChild(
                 sourceText
             );
 
 
-            card.appendChild(
+            sourceCard.appendChild(
                 icon
             );
 
-            card.appendChild(
+            sourceCard.appendChild(
                 content
+            );
+
+            sourceCard.appendChild(
+                expandButton
             );
 
 
             sourcesList.appendChild(
-                card
+                sourceCard
             );
+
         }
     );
 
-
-    showElement(
-        sourcesSection
-    );
 }
 
 
-// =========================
-// Show error
-// =========================
-
-function showError(message) {
-
-    errorMessage.textContent =
-        message ||
-        "An unexpected error occurred.";
-
-
-    showElement(
-        errorCard
-    );
-}
-
-
-// =========================
-// Copy answer
-// =========================
+/* =========================
+   COPY ANSWER
+========================= */
 
 copyButton.addEventListener(
     "click",
     async () => {
 
-        const text =
-            answerText.textContent;
-
-
-        if (!text) {
-            return;
-        }
-
-
         try {
 
             await navigator.clipboard.writeText(
-                text
+                answerText.textContent
             );
+
+
+            const originalText =
+                copyButton.textContent;
 
 
             copyButton.textContent =
-                "Copied";
+                "Copied!";
 
 
-            setTimeout(
-                () => {
+            setTimeout(() => {
 
-                    copyButton.textContent =
-                        "Copy";
+                copyButton.textContent =
+                    originalText;
 
-                },
-                1500
-            );
+            }, 1500);
 
         } catch (error) {
 
@@ -505,33 +553,20 @@ copyButton.addEventListener(
                 "Copy failed:",
                 error
             );
+
         }
+
     }
 );
 
 
-// =========================
-// Ask button
-// =========================
-
-askButton.addEventListener(
-    "click",
-    askNoxora
-);
-
-
-// =========================
-// Enter key
-// =========================
+/* =========================
+   ENTER KEY
+========================= */
 
 questionInput.addEventListener(
     "keydown",
     (event) => {
-
-        /*
-         * Enter = Ask
-         * Shift + Enter = New line
-         */
 
         if (
             event.key === "Enter" &&
@@ -540,35 +575,49 @@ questionInput.addEventListener(
 
             event.preventDefault();
 
-            askNoxora();
+            askQuestion();
+
         }
+
     }
 );
 
 
-// =========================
-// UI helpers
-// =========================
+/* =========================
+   ERROR
+========================= */
+
+function showError(message) {
+
+    errorMessage.textContent =
+        message;
+
+    showElement(errorCard);
+
+}
+
+
+/* =========================
+   HELPERS
+========================= */
 
 function showElement(element) {
 
-    if (!element) {
-        return;
-    }
+    if (!element) return;
 
     element.classList.remove(
         "hidden"
     );
+
 }
 
 
 function hideElement(element) {
 
-    if (!element) {
-        return;
-    }
+    if (!element) return;
 
     element.classList.add(
         "hidden"
     );
+
 }
