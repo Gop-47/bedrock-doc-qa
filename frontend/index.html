@@ -32,7 +32,6 @@
 
     <aside class="sidebar">
 
-
         <div class="brand">
 
             <div class="brand-icon">
@@ -58,7 +57,6 @@
 
 
         <div class="sidebar-section">
-
 
             <div class="section-heading">
 
@@ -95,12 +93,10 @@
 
             </div>
 
-
         </div>
 
 
         <div class="sidebar-footer">
-
 
             <div class="system-status">
 
@@ -112,14 +108,11 @@
 
             </div>
 
-
             <span class="version">
                 AI Knowledge Assistant
             </span>
 
-
         </div>
-
 
     </aside>
 
@@ -134,7 +127,6 @@
         <!-- TOPBAR -->
 
         <header class="topbar">
-
 
             <div class="topbar-left">
 
@@ -157,7 +149,6 @@
 
             </div>
 
-
         </header>
 
 
@@ -177,21 +168,17 @@
 
                 <div class="hero-glow"></div>
 
-
                 <div class="welcome-icon">
                     ✦
                 </div>
-
 
                 <div class="eyebrow">
                     INTELLIGENT KNOWLEDGE SEARCH
                 </div>
 
-
                 <h2>
                     Ask <span>Noxora</span>
                 </h2>
-
 
                 <p>
                     Search your knowledge base with AI-powered
@@ -208,7 +195,9 @@
             <div class="search-area">
 
 
-                <!-- MODE -->
+                <!-- =================================================
+                     MODE TOGGLE
+                ================================================== -->
 
                 <div
                     class="mode-toggle"
@@ -216,7 +205,6 @@
                     role="group"
                     aria-label="AI response mode"
                 >
-
 
                     <button
                         type="button"
@@ -269,12 +257,11 @@
 
                     </button>
 
-
                 </div>
 
 
                 <!-- =================================================
-                     QUESTION
+                     QUESTION FORM
                 ================================================== -->
 
                 <form
@@ -282,12 +269,10 @@
                     class="question-form"
                 >
 
-
                     <div
                         id="questionBox"
                         class="question-box"
                     >
-
 
                         <div class="input-icon">
                             ⌕
@@ -322,7 +307,6 @@
 
                         </button>
 
-
                     </div>
 
 
@@ -353,7 +337,6 @@
 
                     </div>
 
-
                 </form>
 
 
@@ -383,28 +366,59 @@
 
 
                 <!-- =================================================
-                     UPLOAD PDF
+                     PDF UPLOAD
                 ================================================== -->
 
-                <div class="upload-panel">
+                <div
+                    id="uploadPanel"
+                    class="upload-panel"
+                >
+
+                    <input
+                        id="pdfInput"
+                        type="file"
+                        accept=".pdf,application/pdf"
+                    >
 
 
-                    <div class="upload-header">
+                    <div class="upload-dropzone">
 
-                        <div class="upload-header-icon">
-                            +
+                        <div class="upload-icon-wrapper">
+
+                            <div class="upload-icon">
+                                ↑
+                            </div>
+
                         </div>
 
 
-                        <div class="upload-header-text">
+                        <div class="upload-content">
 
-                            <strong>
-                                Add knowledge
-                            </strong>
+                            <h3>
+                                Add knowledge to Noxora
+                            </h3>
 
-                            <span>
-                                Upload a PDF to your Knowledge Base
-                            </span>
+                            <p>
+                                Upload a PDF and make it available
+                                to your Knowledge Base.
+                            </p>
+
+
+                            <div class="upload-meta">
+
+                                <span>
+                                    PDF only
+                                </span>
+
+                                <span class="meta-dot">
+                                    •
+                                </span>
+
+                                <span>
+                                    Maximum 10 MB
+                                </span>
+
+                            </div>
 
                         </div>
 
@@ -415,36 +429,20 @@
                             class="upload-button"
                         >
 
-                            <span>
-                                Upload PDF
+                            <span
+                                id="uploadButtonIcon"
+                                class="upload-button-icon"
+                            >
+                                ↑
+                            </span>
+
+                            <span
+                                id="uploadButtonText"
+                            >
+                                Choose PDF
                             </span>
 
                         </button>
-
-
-                        <input
-                            id="pdfInput"
-                            type="file"
-                            accept=".pdf,application/pdf"
-                            hidden
-                        >
-
-                    </div>
-
-
-                    <div class="upload-help">
-
-                        <span>
-                            PDF only
-                        </span>
-
-                        <span>
-                            •
-                        </span>
-
-                        <span>
-                            Maximum 10 MB
-                        </span>
 
                     </div>
 
@@ -468,11 +466,15 @@
 
                         <div class="upload-status-content">
 
-                            <strong id="uploadStatusTitle">
+                            <strong
+                                id="uploadStatusTitle"
+                            >
                                 Uploading PDF
                             </strong>
 
-                            <span id="uploadStatusMessage">
+                            <span
+                                id="uploadStatusMessage"
+                            >
                                 Preparing your document...
                             </span>
 
@@ -488,9 +490,21 @@
 
                         </div>
 
-
                     </div>
 
+
+                    <div class="upload-note">
+
+                        <span class="upload-note-icon">
+                            ⓘ
+                        </span>
+
+                        <span>
+                            After upload, the document must be ingested
+                            by the Knowledge Base before it can be searched.
+                        </span>
+
+                    </div>
 
                 </div>
 
@@ -507,9 +521,7 @@
                 class="answer-section hidden"
             >
 
-
                 <div class="result-heading">
-
 
                     <div>
 
@@ -543,7 +555,6 @@
 
                     </div>
 
-
                 </div>
 
 
@@ -563,7 +574,6 @@
                     id="sourcesSection"
                     class="sources-section hidden"
                 >
-
 
                     <div class="sources-heading">
 
@@ -587,24 +597,19 @@
                         class="sources-list"
                     ></div>
 
-
                 </div>
-
 
             </div>
 
 
         </section>
 
-
     </main>
-
 
 </div>
 
 
 <script src="script.js"></script>
-
 
 </body>
 
