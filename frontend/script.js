@@ -10,7 +10,7 @@
    ============================================================ */
 
 const API_BASE_URL =
-    "https://YOUR-API-ID.execute-api.us-east-1.amazonaws.com";
+    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
