@@ -5,6 +5,7 @@
 
 "use strict";
 
+
 /* ============================================================
    CONFIGURATION
    ============================================================ */
@@ -12,11 +13,14 @@
 const API_BASE_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE =
+    10 * 1024 * 1024; // 10 MB
 
-const INGESTION_POLL_INTERVAL = 3000; // 3 seconds
+const INGESTION_POLL_INTERVAL =
+    3000; // 3 seconds
 
-const INGESTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const INGESTION_TIMEOUT =
+    5 * 60 * 1000; // 5 minutes
 
 
 /* ============================================================
@@ -139,20 +143,43 @@ async function apiRequest(
     const url =
         `${API_BASE_URL}${path}`;
 
+    const method =
+        (
+            options.method ||
+            "GET"
+        ).toUpperCase();
+
     const fetchOptions = {
         ...options,
+        method,
         headers: {
-            "Content-Type":
-                "application/json",
-
             ...(options.headers || {})
         }
     };
 
+    /*
+     * Only send Content-Type when there is
+     * actually a JSON request body.
+     *
+     * This avoids unnecessary CORS preflight
+     * requests for GET requests.
+     */
+
+    if (
+        options.body &&
+        typeof options.body === "string"
+    ) {
+
+        fetchOptions.headers[
+            "Content-Type"
+        ] = "application/json";
+    }
+
     console.log(
         "API REQUEST:",
-        fetchOptions.method || "GET",
-        url
+        method,
+        url,
+        options.body || ""
     );
 
     const response =
@@ -260,7 +287,9 @@ function initializeModeButtons() {
 }
 
 
-function setMode(mode) {
+function setMode(
+    mode
+) {
 
     if (
         mode !== "rag" &&
@@ -270,7 +299,8 @@ function setMode(mode) {
         mode = "rag";
     }
 
-    currentMode = mode;
+    currentMode =
+        mode;
 
     const modeButtons =
         document.querySelectorAll(
@@ -307,11 +337,6 @@ function setMode(mode) {
    ============================================================ */
 
 function initializeQuestionForm() {
-
-    /*
-     * Find the question input without depending
-     * on one exact ID.
-     */
 
     const questionInput =
         findQuestionInput();
@@ -373,22 +398,14 @@ function findQuestionInput() {
         if (
             element &&
             (
-                element.tagName ===
-                    "TEXTAREA" ||
-                element.tagName ===
-                    "INPUT"
+                element.tagName === "TEXTAREA" ||
+                element.tagName === "INPUT"
             )
         ) {
 
             return element;
         }
     }
-
-    /*
-     * Fallback:
-     * Look for a textarea/input inside
-     * the same form as the Ask button.
-     */
 
     if (askButton) {
 
@@ -443,8 +460,8 @@ async function askQuestion(
     }
 
     /*
-     * RAG should not be queried while a new
-     * document is being indexed.
+     * Don't query RAG while ingestion
+     * is still running.
      */
 
     if (
@@ -461,7 +478,9 @@ async function askQuestion(
 
     isAskingQuestion = true;
 
-    setAskButtonLoading(true);
+    setAskButtonLoading(
+        true
+    );
 
     showAnswerLoading();
 
@@ -474,9 +493,11 @@ async function askQuestion(
                     method: "POST",
 
                     body: JSON.stringify({
-                        question: question,
+                        question:
+                            question,
 
-                        mode: currentMode
+                        mode:
+                            currentMode
                     })
                 }
             );
@@ -487,15 +508,15 @@ async function askQuestion(
         );
 
         /*
-         * IMPORTANT:
-         * Backend returns:
+         * Backend response:
          *
          * {
-         *   question,
-         *   answer,
-         *   mode,
-         *   sources,
-         *   cached
+         *   success: true,
+         *   question: "...",
+         *   answer: "...",
+         *   mode: "rag",
+         *   sources: [],
+         *   cached: false
          * }
          */
 
@@ -520,13 +541,11 @@ async function askQuestion(
         }
 
         /*
-         * THIS is the important UI fix.
+         * IMPORTANT:
          *
-         * Your HTML has:
+         * Render directly into:
          *
-         * <div id="answerContent">
-         *
-         * NOT answerText.
+         * #answerContent
          */
 
         renderAnswer(
@@ -534,7 +553,9 @@ async function askQuestion(
         );
 
         updateAnswerBadges(
-            result.mode || currentMode,
+            result.mode ||
+                currentMode,
+
             result.cached === true
         );
 
@@ -543,7 +564,7 @@ async function askQuestion(
         );
 
         /*
-         * Refresh history after successful query.
+         * Refresh history.
          */
 
         await loadHistory();
@@ -562,9 +583,12 @@ async function askQuestion(
 
     } finally {
 
-        isAskingQuestion = false;
+        isAskingQuestion =
+            false;
 
-        setAskButtonLoading(false);
+        setAskButtonLoading(
+            false
+        );
     }
 }
 
@@ -647,19 +671,11 @@ function renderAnswer(
     }
 
     /*
-     * Use textContent rather than innerHTML
-     * for the AI response.
-     *
-     * This prevents HTML/script injection.
+     * Safely render AI answer.
      */
 
     answerContent.textContent =
         answer;
-
-    /*
-     * Make sure the answer container
-     * is visible.
-     */
 
     answerContent.classList.remove(
         "hidden"
@@ -727,7 +743,8 @@ function renderSources(
         return;
     }
 
-    sourcesList.innerHTML = "";
+    sourcesList.innerHTML =
+        "";
 
     if (
         !Array.isArray(sources) ||
@@ -742,7 +759,10 @@ function renderSources(
     }
 
     sources.forEach(
-        (source, index) => {
+        (
+            source,
+            index
+        ) => {
 
             const item =
                 document.createElement(
@@ -767,7 +787,8 @@ function renderSources(
                     )
                     : null;
 
-            let scoreText = "";
+            let scoreText =
+                "";
 
             if (
                 score !== null &&
@@ -785,8 +806,7 @@ function renderSources(
 
                 <div class="source-preview">
                     ${escapeHtml(
-                        source.uri ||
-                        ""
+                        source.uri || ""
                     )}${escapeHtml(
                         scoreText
                     )}
@@ -942,15 +962,14 @@ async function uploadPdf(
         return;
     }
 
-    isUploading = true;
+    isUploading =
+        true;
 
     try {
 
-        /*
-         * ----------------------------------------------------
-         * VALIDATE FILE
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           VALIDATE FILE
+           ---------------------------------------------------- */
 
         if (!file) {
 
@@ -991,19 +1010,20 @@ async function uploadPdf(
         console.log(
             "Selected PDF:",
             {
-                name: file.name,
+                name:
+                    file.name,
 
-                size: file.size,
+                size:
+                    file.size,
 
-                type: file.type
+                type:
+                    file.type
             }
         );
 
-        /*
-         * ----------------------------------------------------
-         * UI
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           UI
+           ---------------------------------------------------- */
 
         setUploadLoading(
             true
@@ -1019,15 +1039,19 @@ async function uploadPdf(
             5
         );
 
-        /*
-         * ----------------------------------------------------
-         * STEP 1
-         * GET PRESIGNED S3 URL
-         *
-         * IMPORTANT:
-         * Backend expects fileSize.
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           STEP 1
+           CREATE PRESIGNED URL
+
+           POST /upload
+
+           {
+               action: "create",
+               filename: "...",
+               contentType: "application/pdf",
+               fileSize: 123
+           }
+           ---------------------------------------------------- */
 
         console.log(
             "Requesting upload URL..."
@@ -1040,6 +1064,10 @@ async function uploadPdf(
                     method: "POST",
 
                     body: JSON.stringify({
+
+                        action:
+                            "create",
+
                         filename:
                             file.name,
 
@@ -1075,15 +1103,10 @@ async function uploadPdf(
             );
         }
 
-        /*
-         * ----------------------------------------------------
-         * STEP 2
-         * DIRECT S3 UPLOAD
-         *
-         * NO uploads/ DIRECTORY.
-         * Backend creates the key at bucket root.
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           STEP 2
+           DIRECT S3 UPLOAD
+           ---------------------------------------------------- */
 
         setUploadStatus(
             "loading",
@@ -1096,10 +1119,7 @@ async function uploadPdf(
         );
 
         console.log(
-            "Uploading directly to S3:"
-        );
-
-        console.log(
+            "Uploading directly to S3:",
             uploadInfo.key
         );
 
@@ -1114,7 +1134,8 @@ async function uploadPdf(
                             "application/pdf"
                     },
 
-                    body: file
+                    body:
+                        file
                 }
             );
 
@@ -1144,14 +1165,23 @@ async function uploadPdf(
             50
         );
 
-        /*
-         * ----------------------------------------------------
-         * STEP 3
-         * COMPLETE UPLOAD
-         *
-         * This starts Bedrock ingestion.
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           STEP 3
+           COMPLETE UPLOAD
+
+           IMPORTANT:
+           There is NO /upload/complete route.
+
+           Use:
+
+           POST /upload
+
+           {
+               action: "complete",
+               key: "...",
+               filename: "..."
+           }
+           ---------------------------------------------------- */
 
         setUploadStatus(
             "loading",
@@ -1161,11 +1191,15 @@ async function uploadPdf(
 
         const completeInfo =
             await apiRequest(
-                "/upload/complete",
+                "/upload",
                 {
                     method: "POST",
 
                     body: JSON.stringify({
+
+                        action:
+                            "complete",
+
                         key:
                             uploadInfo.key,
 
@@ -1199,12 +1233,10 @@ async function uploadPdf(
             60
         );
 
-        /*
-         * ----------------------------------------------------
-         * STEP 4
-         * POLL INGESTION
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           STEP 4
+           POLL INGESTION
+           ---------------------------------------------------- */
 
         await pollIngestionStatus(
             currentIngestionJobId
@@ -1244,7 +1276,7 @@ async function uploadPdf(
         );
 
         /*
-         * Allow selecting the same file again.
+         * Allow same file to be selected again.
          */
 
         if (pdfInput) {
@@ -1269,9 +1301,9 @@ async function pollIngestionStatus(
 
     while (true) {
 
-        /*
-         * Timeout protection
-         */
+        /* ----------------------------------------------------
+           TIMEOUT
+           ---------------------------------------------------- */
 
         if (
             Date.now() -
@@ -1290,13 +1322,34 @@ async function pollIngestionStatus(
             "Processing and indexing your PDF..."
         );
 
+        /* ----------------------------------------------------
+           IMPORTANT:
+
+           There is NO:
+
+           POST /upload/status
+
+           Instead:
+
+           POST /upload
+
+           {
+               action: "status",
+               ingestionJobId: "..."
+           }
+           ---------------------------------------------------- */
+
         const statusResult =
             await apiRequest(
-                "/upload/status",
+                "/upload",
                 {
                     method: "POST",
 
                     body: JSON.stringify({
+
+                        action:
+                            "status",
+
                         ingestionJobId:
                             ingestionJobId
                     })
@@ -1314,11 +1367,9 @@ async function pollIngestionStatus(
                 ""
             ).toUpperCase();
 
-        /*
-         * ----------------------------------------------------
-         * PROGRESS
-         * ----------------------------------------------------
-         */
+        /* ----------------------------------------------------
+           PROGRESS
+           ---------------------------------------------------- */
 
         if (
             status === "STARTING"
@@ -1364,10 +1415,9 @@ async function pollIngestionStatus(
                 Number(indexed) +
                 Number(modified);
 
-            /*
-             * If ingestion completed but nothing
-             * was indexed, tell the user clearly.
-             */
+            /* ------------------------------------------------
+               FAILED DOCUMENTS
+               ------------------------------------------------ */
 
             if (
                 totalIndexed === 0 &&
@@ -1379,23 +1429,29 @@ async function pollIngestionStatus(
                         statusResult
                             .failureReasons ||
                         []
-                    ).join(
-                        " "
-                    );
+                    ).join(" ");
 
                 throw new Error(
                     `Knowledge Base sync failed. ${failure}`
                 );
             }
 
+            /* ------------------------------------------------
+               NOTHING INDEXED
+               ------------------------------------------------ */
+
             if (
                 totalIndexed === 0
             ) {
 
                 throw new Error(
-                    "Knowledge Base sync completed, but no new document was indexed. Check that the Bedrock S3 data source points to the bucket root."
+                    "Knowledge Base sync completed, but no new document was indexed. Check the Bedrock S3 data source configuration."
                 );
             }
+
+            /* ------------------------------------------------
+               SUCCESS
+               ------------------------------------------------ */
 
             setUploadStatus(
                 "success",
@@ -1408,10 +1464,6 @@ async function pollIngestionStatus(
 
             currentIngestionJobId =
                 null;
-
-            /*
-             * Refresh history.
-             */
 
             await loadHistory();
 
@@ -1429,9 +1481,7 @@ async function pollIngestionStatus(
 
             const failureMessage =
                 failures.length
-                    ? failures.join(
-                        " "
-                    )
+                    ? failures.join(" ")
                     : "Bedrock ingestion failed.";
 
             throw new Error(
@@ -1448,9 +1498,9 @@ async function pollIngestionStatus(
             );
         }
 
-        /*
-         * Wait before polling again.
-         */
+        /* ----------------------------------------------------
+           WAIT
+           ---------------------------------------------------- */
 
         await sleep(
             INGESTION_POLL_INTERVAL
@@ -1520,10 +1570,6 @@ function setUploadStatus(
         return;
     }
 
-    /*
-     * Remove all old states.
-     */
-
     uploadStatus.classList.remove(
         "success",
         "error",
@@ -1538,11 +1584,6 @@ function setUploadStatus(
         uploadStatus.classList.add(
             type
         );
-
-        /*
-         * Keep compatibility with
-         * previous CSS.
-         */
 
         uploadStatus.classList.add(
             `upload-${type}`
@@ -1582,6 +1623,7 @@ function setUploadStatus(
 
             uploadStatusIcon.textContent =
                 "!";
+
         } else {
 
             uploadStatusIcon.textContent =
@@ -1608,9 +1650,19 @@ async function loadHistory() {
 
     try {
 
+        /*
+         * IMPORTANT:
+         *
+         * Correct API Gateway route:
+         *
+         * GET /query/history
+         *
+         * NOT /history
+         */
+
         const result =
             await apiRequest(
-                "/history",
+                "/query/history",
                 {
                     method: "GET"
                 }
@@ -1639,11 +1691,6 @@ async function loadHistory() {
             error
         );
 
-        /*
-         * Don't break the rest of the application
-         * if DynamoDB history has an issue.
-         */
-
         renderHistory(
             []
         );
@@ -1663,10 +1710,6 @@ function renderHistory(
     historyList.innerHTML =
         "";
 
-    /*
-     * Update count.
-     */
-
     if (historyCount) {
 
         historyCount.textContent =
@@ -1674,10 +1717,6 @@ function renderHistory(
                 items.length
             );
     }
-
-    /*
-     * Empty history.
-     */
 
     if (
         items.length === 0
@@ -1743,6 +1782,7 @@ function renderHistory(
                 </div>
 
                 <div class="history-meta">
+
                     <span>
                         ${escapeHtml(
                             mode === "rag"
@@ -1756,13 +1796,9 @@ function renderHistory(
                             timestamp
                         )}
                     </span>
+
                 </div>
             `;
-
-            /*
-             * Clicking history item puts the
-             * question back into the input.
-             */
 
             historyItem.addEventListener(
                 "click",
@@ -1835,9 +1871,11 @@ function formatDate(
         return date.toLocaleString(
             "en-IN",
             {
-                dateStyle: "medium",
+                dateStyle:
+                    "medium",
 
-                timeStyle: "short"
+                timeStyle:
+                    "short"
             }
         );
 
@@ -1902,18 +1940,29 @@ window.noxoraDebug = {
         };
     },
 
+
+    /* --------------------------------------------------------
+       TEST HISTORY
+       -------------------------------------------------------- */
+
     async testHistory() {
 
         return await apiRequest(
-            "/history",
+            "/query/history",
             {
                 method: "GET"
             }
         );
     },
 
+
+    /* --------------------------------------------------------
+       TEST RAG
+       -------------------------------------------------------- */
+
     async testRag(
-        question = "What is this document about?"
+        question =
+            "What is this document about?"
     ) {
 
         return await apiRequest(
@@ -1930,8 +1979,14 @@ window.noxoraDebug = {
         );
     },
 
+
+    /* --------------------------------------------------------
+       TEST DIRECT AI
+       -------------------------------------------------------- */
+
     async testDirect(
-        question = "What is AWS?"
+        question =
+            "What is AWS?"
     ) {
 
         return await apiRequest(
@@ -1943,6 +1998,39 @@ window.noxoraDebug = {
                     question,
 
                     mode: "direct"
+                })
+            }
+        );
+    },
+
+
+    /* --------------------------------------------------------
+       TEST CREATE UPLOAD
+       -------------------------------------------------------- */
+
+    async testUploadCreate(
+        filename = "test.pdf",
+        fileSize = 1000
+    ) {
+
+        return await apiRequest(
+            "/upload",
+            {
+                method: "POST",
+
+                body: JSON.stringify({
+
+                    action:
+                        "create",
+
+                    filename:
+                        filename,
+
+                    contentType:
+                        "application/pdf",
+
+                    fileSize:
+                        fileSize
                 })
             }
         );
