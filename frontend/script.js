@@ -7,12 +7,16 @@
 //   POST /query
 //   GET  /query/history
 //   POST /upload
+//   POST /upload/complete
+//   POST /upload/status
 //
 // PDF upload:
-//   1. POST /upload -> get presigned S3 URL
+//   1. POST /upload
 //   2. PUT PDF directly to S3
+//   3. POST /upload/complete
+//   4. Poll /upload/status
+//   5. Wait for Knowledge Base ingestion
 // ============================================================
-
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -36,8 +40,20 @@ const HISTORY_URL =
 const UPLOAD_URL =
     `${API_BASE_URL}/upload`;
 
+const UPLOAD_COMPLETE_URL =
+    `${API_BASE_URL}/upload/complete`;
+
+const UPLOAD_STATUS_URL =
+    `${API_BASE_URL}/upload/status`;
+
 const MAX_PDF_SIZE =
-    10 * 1024 * 1024; // 10 MB
+    10 * 1024 * 1024;
+
+const INGESTION_POLL_INTERVAL =
+    3000;
+
+const MAX_INGESTION_WAIT =
+    5 * 60 * 1000;
 
 
 // ============================================================
@@ -56,6 +72,8 @@ let isUploading = false;
 
 let isAsking = false;
 
+let ingestionInProgress = false;
+
 
 // ============================================================
 // DOM ELEMENTS
@@ -64,25 +82,37 @@ let isAsking = false;
 let questionForm;
 let questionInput;
 let askButton;
+
 let answerSection;
 let answerText;
+
 let sourcesSection;
 let sourcesList;
+
 let historyList;
 let emptyHistory;
+let historyCount;
+
 let ragButton;
 let directButton;
-let modeDescription;
+
+let answerModeBadge;
+let cacheBadge;
 
 let uploadButton;
 let pdfInput;
+
 let uploadStatus;
 let uploadStatusIcon;
 let uploadStatusTitle;
 let uploadStatusMessage;
 let uploadProgressBar;
+
 let uploadButtonIcon;
 let uploadButtonText;
+
+let askButtonText;
+let askButtonIcon;
 
 
 // ============================================================
@@ -104,11 +134,19 @@ function initializeNoxora() {
     askButton =
         document.getElementById("askButton");
 
+    askButtonText =
+        document.getElementById("askButtonText");
+
+    askButtonIcon =
+        document.getElementById("askButtonIcon");
+
     answerSection =
         document.getElementById("answerSection");
 
+    // IMPORTANT:
+    // HTML uses answerContent, not answerText.
     answerText =
-        document.getElementById("answerText");
+        document.getElementById("answerContent");
 
     sourcesSection =
         document.getElementById("sourcesSection");
@@ -116,29 +154,56 @@ function initializeNoxora() {
     sourcesList =
         document.getElementById("sourcesList");
 
+
+    // --------------------------------------------------------
+    // History
+    // --------------------------------------------------------
+
     historyList =
         document.getElementById("historyList");
 
+    // HTML uses a CLASS, not an ID.
     emptyHistory =
-        document.getElementById("emptyHistory");
+        document.querySelector(".history-empty");
+
+    historyCount =
+        document.getElementById("historyCount");
 
 
     // --------------------------------------------------------
-    // Mode elements
+    // Mode buttons
     // --------------------------------------------------------
+    // HTML does not have ragButton/directButton IDs.
+    // Use data-mode instead.
 
     ragButton =
-        document.getElementById("ragButton");
+        document.querySelector(
+            '.mode-option[data-mode="rag"]'
+        );
 
     directButton =
-        document.getElementById("directButton");
-
-    modeDescription =
-        document.getElementById("modeDescription");
+        document.querySelector(
+            '.mode-option[data-mode="direct"]'
+        );
 
 
     // --------------------------------------------------------
-    // Upload elements
+    // Answer badges
+    // --------------------------------------------------------
+
+    answerModeBadge =
+        document.getElementById(
+            "answerModeBadge"
+        );
+
+    cacheBadge =
+        document.getElementById(
+            "cacheBadge"
+        );
+
+
+    // --------------------------------------------------------
+    // Upload
     // --------------------------------------------------------
 
     uploadButton =
@@ -151,22 +216,34 @@ function initializeNoxora() {
         document.getElementById("uploadStatus");
 
     uploadStatusIcon =
-        document.getElementById("uploadStatusIcon");
+        document.getElementById(
+            "uploadStatusIcon"
+        );
 
     uploadStatusTitle =
-        document.getElementById("uploadStatusTitle");
+        document.getElementById(
+            "uploadStatusTitle"
+        );
 
     uploadStatusMessage =
-        document.getElementById("uploadStatusMessage");
+        document.getElementById(
+            "uploadStatusMessage"
+        );
 
     uploadProgressBar =
-        document.getElementById("uploadProgressBar");
+        document.getElementById(
+            "uploadProgressBar"
+        );
 
     uploadButtonIcon =
-        document.getElementById("uploadButtonIcon");
+        document.getElementById(
+            "uploadButtonIcon"
+        );
 
     uploadButtonText =
-        document.getElementById("uploadButtonText");
+        document.getElementById(
+            "uploadButtonText"
+        );
 
 
     // --------------------------------------------------------
@@ -187,7 +264,9 @@ function initializeNoxora() {
 
         ragButton.addEventListener(
             "click",
-            () => setMode("rag")
+            function () {
+                setMode("rag");
+            }
         );
 
     }
@@ -197,7 +276,9 @@ function initializeNoxora() {
 
         directButton.addEventListener(
             "click",
-            () => setMode("direct")
+            function () {
+                setMode("direct");
+            }
         );
 
     }
@@ -213,7 +294,10 @@ function initializeNoxora() {
             "click",
             function () {
 
-                if (isUploading) {
+                if (
+                    isUploading ||
+                    ingestionInProgress
+                ) {
                     return;
                 }
 
@@ -245,7 +329,7 @@ function initializeNoxora() {
 
                 await uploadPdf(file);
 
-                // Allow selecting the same file again.
+                // Allow selecting same file again.
                 pdfInput.value = "";
 
             }
@@ -272,7 +356,11 @@ function initializeNoxora() {
     // --------------------------------------------------------
 
     console.log(
-        "Noxora initialized."
+        "============================================"
+    );
+
+    console.log(
+        "Noxora initialized"
     );
 
     console.log(
@@ -291,13 +379,32 @@ function initializeNoxora() {
     );
 
     console.log(
-        "Upload button:",
-        uploadButton
+        "Upload complete URL:",
+        UPLOAD_COMPLETE_URL
     );
 
     console.log(
-        "PDF input:",
-        pdfInput
+        "Upload status URL:",
+        UPLOAD_STATUS_URL
+    );
+
+    console.log(
+        "Answer element:",
+        answerText
+    );
+
+    console.log(
+        "RAG button:",
+        ragButton
+    );
+
+    console.log(
+        "Direct button:",
+        directButton
+    );
+
+    console.log(
+        "============================================"
     );
 }
 
@@ -321,15 +428,18 @@ function setMode(mode) {
     currentMode = mode;
 
 
-    // --------------------------------------------------------
-    // Button states
-    // --------------------------------------------------------
-
     if (ragButton) {
 
         ragButton.classList.toggle(
             "active",
             mode === "rag"
+        );
+
+        ragButton.setAttribute(
+            "aria-pressed",
+            mode === "rag"
+                ? "true"
+                : "false"
         );
 
     }
@@ -342,26 +452,12 @@ function setMode(mode) {
             mode === "direct"
         );
 
-    }
-
-
-    // --------------------------------------------------------
-    // Description
-    // --------------------------------------------------------
-
-    if (modeDescription) {
-
-        if (mode === "rag") {
-
-            modeDescription.textContent =
-                "Answers from your uploaded knowledge base with sources.";
-
-        } else {
-
-            modeDescription.textContent =
-                "Answers directly from the AI without knowledge-base sources.";
-
-        }
+        directButton.setAttribute(
+            "aria-pressed",
+            mode === "direct"
+                ? "true"
+                : "false"
+        );
 
     }
 
@@ -417,9 +513,27 @@ async function askQuestion() {
     }
 
 
+    // --------------------------------------------------------
+    // Prevent RAG query while ingestion is running.
+    // --------------------------------------------------------
+
+    if (
+        currentMode === "rag" &&
+        ingestionInProgress
+    ) {
+
+        showError(
+            "Your PDF is still being indexed by the Knowledge Base. Please wait until ingestion is complete and then ask your question."
+        );
+
+        return;
+    }
+
+
     isAsking = true;
 
-    currentQuestion = question;
+    currentQuestion =
+        question;
 
 
     setAskButtonLoading(true);
@@ -432,8 +546,10 @@ async function askQuestion() {
         console.log(
             "Sending query:",
             {
-                question: question,
-                mode: currentMode
+                question:
+                    question,
+                mode:
+                    currentMode
             }
         );
 
@@ -449,10 +565,14 @@ async function askQuestion() {
                             "application/json"
                     },
 
-                    body: JSON.stringify({
-                        question: question,
-                        mode: currentMode
-                    })
+                    body:
+                        JSON.stringify({
+                            question:
+                                question,
+
+                            mode:
+                                currentMode
+                        })
                 }
             );
 
@@ -480,19 +600,30 @@ async function askQuestion() {
         }
 
 
+        // ----------------------------------------------------
+        // Extract answer
+        // ----------------------------------------------------
+
         currentAnswer =
-            data.answer || "";
+            typeof data.answer === "string"
+                ? data.answer
+                : "";
+
+
+        // ----------------------------------------------------
+        // Extract sources
+        // ----------------------------------------------------
 
         currentSources =
-            Array.isArray(data.sources)
+            Array.isArray(
+                data.sources
+            )
                 ? data.sources
                 : [];
 
 
         // ----------------------------------------------------
-        // Important:
-        // Lambda may force Direct AI -> RAG.
-        // Always use actual returned mode.
+        // Actual mode returned by Lambda
         // ----------------------------------------------------
 
         if (
@@ -503,15 +634,34 @@ async function askQuestion() {
             currentMode =
                 data.mode;
 
-            updateModeButtonsFromResponse();
-
         }
 
+
+        updateModeButtonsFromResponse();
+
+
+        // ----------------------------------------------------
+        // Update answer badge
+        // ----------------------------------------------------
+
+        updateAnswerBadges(
+            currentMode,
+            data.cached === true
+        );
+
+
+        // ----------------------------------------------------
+        // Display answer
+        // ----------------------------------------------------
 
         displayAnswer(
             currentAnswer
         );
 
+
+        // ----------------------------------------------------
+        // Display sources
+        // ----------------------------------------------------
 
         displaySources(
             currentSources,
@@ -519,7 +669,10 @@ async function askQuestion() {
         );
 
 
-        // Refresh history.
+        // ----------------------------------------------------
+        // Refresh history
+        // ----------------------------------------------------
+
         await loadHistory();
 
 
@@ -551,7 +704,9 @@ async function askQuestion() {
 // JSON RESPONSE PARSER
 // ============================================================
 
-async function parseJsonResponse(response) {
+async function parseJsonResponse(
+    response
+) {
 
     const text =
         await response.text();
@@ -594,8 +749,11 @@ function displayAnswer(answer) {
 
     if (answerText) {
 
+        // Use textContent deliberately.
+        // This prevents model output from injecting HTML.
         answerText.textContent =
-            answer || "No answer returned.";
+            answer ||
+            "No answer returned.";
 
     }
 
@@ -647,6 +805,53 @@ function hideAnswer() {
 
         sourcesSection.classList.add(
             "hidden"
+        );
+
+    }
+
+
+    if (cacheBadge) {
+
+        cacheBadge.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// UPDATE ANSWER BADGES
+// ============================================================
+
+function updateAnswerBadges(
+    mode,
+    cached
+) {
+
+    if (answerModeBadge) {
+
+        if (mode === "direct") {
+
+            answerModeBadge.textContent =
+                "DIRECT AI";
+
+        } else {
+
+            answerModeBadge.textContent =
+                "KNOWLEDGE BASE";
+
+        }
+
+    }
+
+
+    if (cacheBadge) {
+
+        cacheBadge.classList.toggle(
+            "hidden",
+            !cached
         );
 
     }
@@ -704,6 +909,10 @@ function displaySources(
                 "source-item";
 
 
+            // ------------------------------------------------
+            // Number
+            // ------------------------------------------------
+
             const sourceNumber =
                 document.createElement(
                     "div"
@@ -716,6 +925,10 @@ function displaySources(
                 String(index + 1);
 
 
+            // ------------------------------------------------
+            // Content
+            // ------------------------------------------------
+
             const sourceContent =
                 document.createElement(
                     "div"
@@ -725,9 +938,14 @@ function displaySources(
                 "source-content";
 
 
+            // ------------------------------------------------
+            // URI
+            // ------------------------------------------------
+
             const uri =
                 source.uri ||
                 source.url ||
+                source.filename ||
                 "Knowledge Base";
 
 
@@ -736,8 +954,9 @@ function displaySources(
                     "div"
                 );
 
+            // Match CSS naming better.
             uriElement.className =
-                "source-uri";
+                "source-name";
 
             uriElement.textContent =
                 cleanS3Uri(uri);
@@ -747,6 +966,10 @@ function displaySources(
                 uriElement
             );
 
+
+            // ------------------------------------------------
+            // Preview
+            // ------------------------------------------------
 
             if (source.text) {
 
@@ -758,17 +981,55 @@ function displaySources(
                 preview.className =
                     "source-preview";
 
+
+                const sourceText =
+                    String(
+                        source.text
+                    );
+
+
                 preview.textContent =
-                    source.text.length > 300
-                        ? source.text.substring(
+                    sourceText.length > 300
+                        ? sourceText.substring(
                             0,
                             300
                         ) + "..."
-                        : source.text;
+                        : sourceText;
 
 
                 sourceContent.appendChild(
                     preview
+                );
+
+            }
+
+
+            // ------------------------------------------------
+            // Score
+            // ------------------------------------------------
+
+            if (
+                source.score !== undefined &&
+                source.score !== null
+            ) {
+
+                const scoreElement =
+                    document.createElement(
+                        "div"
+                    );
+
+                scoreElement.className =
+                    "source-score";
+
+                scoreElement.textContent =
+                    `Relevance: ${(
+                        Number(
+                            source.score
+                        ) * 100
+                    ).toFixed(1)}%`;
+
+                sourceContent.appendChild(
+                    scoreElement
                 );
 
             }
@@ -804,22 +1065,28 @@ function displaySources(
 function cleanS3Uri(uri) {
 
     if (!uri) {
+
         return "Knowledge Base source";
+
     }
 
 
+    const value =
+        String(uri);
+
+
     if (
-        uri.startsWith(
+        value.startsWith(
             "s3://"
         )
     ) {
 
-        return uri.substring(5);
+        return value.substring(5);
 
     }
 
 
-    return uri;
+    return value;
 }
 
 
@@ -836,6 +1103,13 @@ function updateModeButtonsFromResponse() {
             currentMode === "rag"
         );
 
+        ragButton.setAttribute(
+            "aria-pressed",
+            currentMode === "rag"
+                ? "true"
+                : "false"
+        );
+
     }
 
 
@@ -846,24 +1120,20 @@ function updateModeButtonsFromResponse() {
             currentMode === "direct"
         );
 
-    }
-
-
-    if (modeDescription) {
-
-        if (currentMode === "rag") {
-
-            modeDescription.textContent =
-                "Answers from your uploaded knowledge base with sources.";
-
-        } else {
-
-            modeDescription.textContent =
-                "Answers directly from the AI without knowledge-base sources.";
-
-        }
+        directButton.setAttribute(
+            "aria-pressed",
+            currentMode === "direct"
+                ? "true"
+                : "false"
+        );
 
     }
+
+
+    updateAnswerBadges(
+        currentMode,
+        false
+    );
 }
 
 
@@ -901,7 +1171,9 @@ async function loadHistory() {
 
 
         const history =
-            Array.isArray(data.history)
+            Array.isArray(
+                data.history
+            )
                 ? data.history
                 : [];
 
@@ -919,7 +1191,6 @@ async function loadHistory() {
         );
 
         renderHistory([]);
-
 
     }
 }
@@ -940,31 +1211,58 @@ function renderHistory(history) {
         "";
 
 
-    if (
-        !Array.isArray(history) ||
-        history.length === 0
-    ) {
+    const safeHistory =
+        Array.isArray(history)
+            ? history
+            : [];
 
-        if (emptyHistory) {
 
-            emptyHistory.style.display =
-                "block";
+    // --------------------------------------------------------
+    // Count
+    // --------------------------------------------------------
 
-        }
+    if (historyCount) {
+
+        historyCount.textContent =
+            String(
+                safeHistory.length
+            );
+
+    }
+
+
+    // --------------------------------------------------------
+    // Empty
+    // --------------------------------------------------------
+
+    if (safeHistory.length === 0) {
+
+        const empty =
+            document.createElement(
+                "div"
+            );
+
+        empty.className =
+            "history-empty";
+
+        empty.innerHTML = `
+            <div class="history-empty-icon">◌</div>
+            <span>No queries yet</span>
+        `;
+
+        historyList.appendChild(
+            empty
+        );
 
         return;
     }
 
 
-    if (emptyHistory) {
+    // --------------------------------------------------------
+    // History items
+    // --------------------------------------------------------
 
-        emptyHistory.style.display =
-            "none";
-
-    }
-
-
-    history.forEach(
+    safeHistory.forEach(
         function (item) {
 
             const historyItem =
@@ -1061,11 +1359,15 @@ function restoreHistoryItem(item) {
     currentQuestion =
         item.question || "";
 
+
     currentAnswer =
         item.answer || "";
 
+
     currentSources =
-        Array.isArray(item.sources)
+        Array.isArray(
+            item.sources
+        )
             ? item.sources
             : [];
 
@@ -1085,6 +1387,12 @@ function restoreHistoryItem(item) {
 
 
     updateModeButtonsFromResponse();
+
+
+    updateAnswerBadges(
+        currentMode,
+        item.cached === true
+    );
 
 
     displayAnswer(
@@ -1122,10 +1430,6 @@ async function uploadPdf(file) {
     );
 
 
-    // --------------------------------------------------------
-    // Validate file
-    // --------------------------------------------------------
-
     const validationError =
         validatePdf(file);
 
@@ -1142,24 +1446,26 @@ async function uploadPdf(file) {
 
     isUploading = true;
 
-    setUploadButtonLoading(true);
+    ingestionInProgress = true;
 
-    showUploadStatus(
-        "loading",
-        "Preparing upload",
-        "Creating a secure upload URL..."
-    );
+    setUploadButtonLoading(true);
 
 
     try {
 
         // ====================================================
-        // STEP 1
-        // Ask Lambda for presigned S3 URL
+        // STEP 1 — CREATE PRESIGNED URL
         // ====================================================
 
+        showUploadStatus(
+            "loading",
+            "Preparing upload",
+            "Creating a secure upload URL..."
+        );
+
+
         console.log(
-            "POST upload URL:",
+            "POST:",
             UPLOAD_URL
         );
 
@@ -1175,16 +1481,17 @@ async function uploadPdf(file) {
                             "application/json"
                     },
 
-                    body: JSON.stringify({
-                        filename:
-                            file.name,
+                    body:
+                        JSON.stringify({
+                            filename:
+                                file.name,
 
-                        contentType:
-                            "application/pdf",
+                            contentType:
+                                "application/pdf",
 
-                        size:
-                            file.size
-                    })
+                            size:
+                                file.size
+                        })
                 }
             );
 
@@ -1220,6 +1527,11 @@ async function uploadPdf(file) {
             data.key;
 
 
+        const filename =
+            data.filename ||
+            file.name;
+
+
         if (!uploadUrl) {
 
             throw new Error(
@@ -1229,9 +1541,17 @@ async function uploadPdf(file) {
         }
 
 
+        if (!objectKey) {
+
+            throw new Error(
+                "Server did not return the S3 object key."
+            );
+
+        }
+
+
         // ====================================================
-        // STEP 2
-        // Upload PDF directly to S3
+        // STEP 2 — UPLOAD TO S3
         // ====================================================
 
         showUploadStatus(
@@ -1247,19 +1567,110 @@ async function uploadPdf(file) {
         );
 
 
+        console.log(
+            "S3 upload completed:",
+            objectKey
+        );
+
+
         // ====================================================
-        // SUCCESS
+        // STEP 3 — TELL LAMBDA UPLOAD IS COMPLETE
+        // ====================================================
+
+        showUploadStatus(
+            "loading",
+            "Starting Knowledge Base ingestion",
+            "The PDF is uploaded. Noxora is now indexing the document..."
+        );
+
+
+        const completeResponse =
+            await fetch(
+                UPLOAD_COMPLETE_URL,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            key:
+                                objectKey,
+
+                            filename:
+                                filename
+                        })
+                }
+            );
+
+
+        const completeData =
+            await parseJsonResponse(
+                completeResponse
+            );
+
+
+        console.log(
+            "Upload complete response:",
+            completeData
+        );
+
+
+        if (!completeResponse.ok) {
+
+            throw new Error(
+                completeData.error ||
+                completeData.message ||
+                "Knowledge Base ingestion could not be started."
+            );
+
+        }
+
+
+        const ingestionJobId =
+            completeData.ingestionJobId;
+
+
+        if (!ingestionJobId) {
+
+            throw new Error(
+                "Knowledge Base ingestion started without returning an ingestion job ID."
+            );
+
+        }
+
+
+        console.log(
+            "Ingestion job:",
+            ingestionJobId
+        );
+
+
+        // ====================================================
+        // STEP 4 — WAIT FOR INGESTION
+        // ====================================================
+
+        await waitForIngestion(
+            ingestionJobId
+        );
+
+
+        // ====================================================
+        // STEP 5 — SUCCESS
         // ====================================================
 
         showUploadStatus(
             "success",
-            "PDF uploaded successfully",
-            "Your PDF has been uploaded to the document bucket. It must be ingested by the Knowledge Base before it becomes searchable."
+            "PDF is ready",
+            "Your PDF has been uploaded and indexed successfully. You can now ask questions about it."
         );
 
 
         console.log(
-            "PDF uploaded successfully:",
+            "PDF is searchable:",
             objectKey
         );
 
@@ -1282,9 +1693,186 @@ async function uploadPdf(file) {
 
         isUploading = false;
 
+        ingestionInProgress = false;
+
         setUploadButtonLoading(false);
 
     }
+}
+
+
+// ============================================================
+// WAIT FOR INGESTION
+// ============================================================
+
+async function waitForIngestion(
+    ingestionJobId
+) {
+
+    const startTime =
+        Date.now();
+
+
+    while (
+        Date.now() - startTime <
+        MAX_INGESTION_WAIT
+    ) {
+
+        showUploadStatus(
+            "loading",
+            "Indexing PDF",
+            "Knowledge Base is processing your document. Please wait..."
+        );
+
+
+        const response =
+            await fetch(
+                UPLOAD_STATUS_URL,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            ingestionJobId:
+                                ingestionJobId
+                        })
+                }
+            );
+
+
+        const data =
+            await parseJsonResponse(
+                response
+            );
+
+
+        console.log(
+            "Ingestion status:",
+            data
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                data.message ||
+                "Unable to check Knowledge Base ingestion status."
+            );
+
+        }
+
+
+        const status =
+            String(
+                data.status || ""
+            ).toUpperCase();
+
+
+        // ----------------------------------------------------
+        // COMPLETE
+        // ----------------------------------------------------
+
+        if (
+            status === "COMPLETE"
+        ) {
+
+            console.log(
+                "Knowledge Base ingestion COMPLETE"
+            );
+
+            return data;
+
+        }
+
+
+        // ----------------------------------------------------
+        // FAILED
+        // ----------------------------------------------------
+
+        if (
+            status === "FAILED"
+        ) {
+
+            let failureMessage =
+                "Knowledge Base ingestion failed.";
+
+
+            if (
+                Array.isArray(
+                    data.failureReasons
+                ) &&
+                data.failureReasons.length > 0
+            ) {
+
+                failureMessage +=
+                    ` ${data.failureReasons.join(" ")}`;
+
+            }
+
+
+            throw new Error(
+                failureMessage
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // STOPPED
+        // ----------------------------------------------------
+
+        if (
+            status === "STOPPED"
+        ) {
+
+            throw new Error(
+                "Knowledge Base ingestion was stopped."
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // Poll again
+        // ----------------------------------------------------
+
+        await sleep(
+            INGESTION_POLL_INTERVAL
+        );
+
+    }
+
+
+    throw new Error(
+        "Knowledge Base ingestion timed out. Please check the AWS Knowledge Base ingestion job in the AWS console."
+    );
+}
+
+
+// ============================================================
+// SLEEP
+// ============================================================
+
+function sleep(
+    milliseconds
+) {
+
+    return new Promise(
+        function (resolve) {
+
+            setTimeout(
+                resolve,
+                milliseconds
+            );
+
+        }
+    );
 }
 
 
@@ -1312,7 +1900,9 @@ function validatePdf(file) {
             .pop();
 
 
-    if (extension !== "pdf") {
+    if (
+        extension !== "pdf"
+    ) {
 
         return "Only PDF files are allowed.";
 
@@ -1329,14 +1919,18 @@ function validatePdf(file) {
     }
 
 
-    if (file.size <= 0) {
+    if (
+        file.size <= 0
+    ) {
 
         return "The selected PDF is empty.";
 
     }
 
 
-    if (file.size > MAX_PDF_SIZE) {
+    if (
+        file.size > MAX_PDF_SIZE
+    ) {
 
         return "PDF size must be 10 MB or smaller.";
 
@@ -1387,7 +1981,9 @@ function uploadFileToS3(
                     if (
                         !event.lengthComputable
                     ) {
+
                         return;
+
                     }
 
 
@@ -1409,7 +2005,7 @@ function uploadFileToS3(
 
 
             // ------------------------------------------------
-            // Success
+            // Complete
             // ------------------------------------------------
 
             xhr.addEventListener(
@@ -1483,10 +2079,6 @@ function uploadFileToS3(
             );
 
 
-            // ------------------------------------------------
-            // Send PDF
-            // ------------------------------------------------
-
             xhr.send(
                 file
             );
@@ -1515,12 +2107,20 @@ function showUploadStatus(
         "hidden",
         "upload-success",
         "upload-error",
-        "upload-loading"
+        "upload-loading",
+        "success",
+        "error",
+        "loading"
     );
 
 
+    // Add both naming conventions.
+    // Your CSS currently uses .success/.error,
+    // while older JS used .upload-success/etc.
+
     uploadStatus.classList.add(
-        `upload-${type}`
+        `upload-${type}`,
+        type
     );
 
 
@@ -1542,12 +2142,16 @@ function showUploadStatus(
 
     if (uploadStatusIcon) {
 
-        if (type === "success") {
+        if (
+            type === "success"
+        ) {
 
             uploadStatusIcon.textContent =
                 "✓";
 
-        } else if (type === "error") {
+        } else if (
+            type === "error"
+        ) {
 
             uploadStatusIcon.textContent =
                 "×";
@@ -1563,14 +2167,19 @@ function showUploadStatus(
 
 
     if (
-        type === "success" ||
+        type === "success"
+    ) {
+
+        updateUploadProgress(
+            100
+        );
+
+    } else if (
         type === "error"
     ) {
 
         updateUploadProgress(
-            type === "success"
-                ? 100
-                : 0
+            0
         );
 
     }
@@ -1593,7 +2202,9 @@ function hideUploadStatus() {
     }
 
 
-    updateUploadProgress(0);
+    updateUploadProgress(
+        0
+    );
 }
 
 
@@ -1673,8 +2284,8 @@ function setUploadButtonLoading(
 
         uploadButtonText.textContent =
             loading
-                ? "Uploading..."
-                : "Upload PDF";
+                ? "Processing..."
+                : "Choose PDF";
 
     }
 
@@ -1698,21 +2309,12 @@ function setAskButtonLoading(
         loading;
 
 
-    const buttonText =
-        askButton.querySelector(
-            ".button-text"
-        );
+    // IMPORTANT:
+    // HTML uses IDs askButtonText / askButtonIcon.
 
+    if (askButtonText) {
 
-    const buttonIcon =
-        askButton.querySelector(
-            ".button-icon"
-        );
-
-
-    if (buttonText) {
-
-        buttonText.textContent =
+        askButtonText.textContent =
             loading
                 ? "Thinking..."
                 : "Ask Noxora";
@@ -1720,14 +2322,15 @@ function setAskButtonLoading(
     }
 
 
-    if (buttonIcon) {
+    if (askButtonIcon) {
 
-        buttonIcon.textContent =
+        askButtonIcon.textContent =
             loading
                 ? "..."
-                : "→";
+                : "↑";
 
     }
+
 }
 
 
@@ -1764,6 +2367,12 @@ function showError(
 
     }
 
+
+    updateAnswerBadges(
+        currentMode,
+        false
+    );
+
 }
 
 
@@ -1780,27 +2389,35 @@ function showTemporaryMessage(
     );
 
 
-    if (questionInput) {
-
-        questionInput.setAttribute(
-            "placeholder",
-            message
-        );
-
-
-        setTimeout(
-            function () {
-
-                questionInput.setAttribute(
-                    "placeholder",
-                    "Ask anything about your knowledge base..."
-                );
-
-            },
-            2500
-        );
-
+    if (!questionInput) {
+        return;
     }
+
+
+    const originalPlaceholder =
+        questionInput.getAttribute(
+            "placeholder"
+        ) ||
+        "Ask a question about your documents...";
+
+
+    questionInput.setAttribute(
+        "placeholder",
+        message
+    );
+
+
+    setTimeout(
+        function () {
+
+            questionInput.setAttribute(
+                "placeholder",
+                originalPlaceholder
+            );
+
+        },
+        2500
+    );
 
 }
 
