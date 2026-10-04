@@ -2,7 +2,7 @@ const API_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
 
 const HISTORY_API_URL =
-    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/history";
+    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query/history";
 
 console.log("NOXORA SCRIPT LOADED");
 
