@@ -22,446 +22,589 @@
 
 <body>
 
-    <div class="app-shell">
 
-        <!-- =================================================
-             SIDEBAR
-        ================================================== -->
+<div class="app-shell">
 
-        <aside class="sidebar">
 
-            <div class="brand">
+    <!-- =================================================
+         SIDEBAR
+    ================================================== -->
 
-                <div class="brand-icon">
-                    N
-                </div>
+    <aside class="sidebar">
 
-                <div class="brand-text">
 
-                    <h1>Noxora</h1>
+        <div class="brand">
 
-                    <span>
-                        AI Knowledge Assistant
-                    </span>
-
-                </div>
-
+            <div class="brand-icon">
+                N
             </div>
 
+            <div class="brand-text">
 
-            <div class="sidebar-divider"></div>
+                <h1>
+                    Noxora
+                </h1>
 
-
-            <div class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span>
-                        Query History
-                    </span>
-
-                    <span
-                        id="historyCount"
-                        class="history-count"
-                    >
-                        0
-                    </span>
-
-                </div>
-
-
-                <div
-                    id="historyList"
-                    class="history-list"
-                >
-
-                    <div class="history-empty">
-
-                        <div class="history-empty-icon">
-                            ◌
-                        </div>
-
-                        <span>
-                            No queries yet
-                        </span>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="sidebar-footer">
-
-                <div class="system-status">
-
-                    <span class="status-dot"></span>
-
-                    <span>
-                        Noxora systems online
-                    </span>
-
-                </div>
-
-                <span class="version">
+                <span>
                     AI Knowledge Assistant
                 </span>
 
             </div>
 
-        </aside>
+        </div>
 
 
-        <!-- =================================================
-             MAIN CONTENT
-        ================================================== -->
-
-        <main class="main-content">
+        <div class="sidebar-divider"></div>
 
 
-            <!-- TOP NAV -->
+        <div class="sidebar-section">
 
-            <header class="topbar">
 
-                <div class="topbar-left">
+            <div class="section-heading">
 
-                    <div class="breadcrumb">
-                        Knowledge Assistant
+                <span>
+                    Query History
+                </span>
+
+                <span
+                    id="historyCount"
+                    class="history-count"
+                >
+                    0
+                </span>
+
+            </div>
+
+
+            <div
+                id="historyList"
+                class="history-list"
+            >
+
+                <div class="history-empty">
+
+                    <div class="history-empty-icon">
+                        ◌
                     </div>
+
+                    <span>
+                        No queries yet
+                    </span>
 
                 </div>
 
+            </div>
 
-                <div class="topbar-right">
 
-                    <div class="online-badge">
+        </div>
 
-                        <span class="status-dot"></span>
 
-                        Online
+        <div class="sidebar-footer">
 
-                    </div>
+
+            <div class="system-status">
+
+                <span class="status-dot"></span>
+
+                <span>
+                    Noxora systems online
+                </span>
+
+            </div>
+
+
+            <span class="version">
+                AI Knowledge Assistant
+            </span>
+
+
+        </div>
+
+
+    </aside>
+
+
+    <!-- =================================================
+         MAIN
+    ================================================== -->
+
+    <main class="main-content">
+
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+
+            <div class="topbar-left">
+
+                <div class="breadcrumb">
+                    Knowledge Assistant
+                </div>
+
+            </div>
+
+
+            <div class="topbar-right">
+
+                <div class="online-badge">
+
+                    <span class="status-dot"></span>
+
+                    Online
 
                 </div>
 
-            </header>
+            </div>
+
+
+        </header>
+
+
+        <!-- CONTENT -->
+
+        <section class="content-area">
 
 
             <!-- =================================================
-                 CONTENT
+                 HERO
             ================================================== -->
 
-            <section class="content-area">
+            <div
+                id="welcomeSection"
+                class="welcome-section"
+            >
+
+                <div class="hero-glow"></div>
 
 
-                <!-- =================================================
-                     HERO
-                ================================================== -->
+                <div class="welcome-icon">
+                    ✦
+                </div>
+
+
+                <div class="eyebrow">
+                    INTELLIGENT KNOWLEDGE SEARCH
+                </div>
+
+
+                <h2>
+                    Ask <span>Noxora</span>
+                </h2>
+
+
+                <p>
+                    Search your knowledge base with AI-powered
+                    answers grounded in your documents.
+                </p>
+
+            </div>
+
+
+            <!-- =================================================
+                 SEARCH AREA
+            ================================================== -->
+
+            <div class="search-area">
+
+
+                <!-- MODE -->
 
                 <div
-                    id="welcomeSection"
-                    class="welcome-section"
+                    class="mode-toggle"
+                    id="modeToggle"
+                    role="group"
+                    aria-label="AI response mode"
                 >
 
-                    <div class="hero-glow"></div>
+
+                    <button
+                        type="button"
+                        class="mode-option active"
+                        data-mode="rag"
+                        aria-pressed="true"
+                    >
+
+                        <span class="mode-option-icon">
+                            ◈
+                        </span>
+
+                        <span class="mode-option-text">
+
+                            <strong>
+                                RAG
+                            </strong>
+
+                            <small>
+                                Knowledge Base
+                            </small>
+
+                        </span>
+
+                    </button>
 
 
-                    <div class="welcome-icon">
-                        ✦
-                    </div>
+                    <button
+                        type="button"
+                        class="mode-option"
+                        data-mode="direct"
+                        aria-pressed="false"
+                    >
 
+                        <span class="mode-option-icon">
+                            ✦
+                        </span>
 
-                    <div class="eyebrow">
-                        INTELLIGENT KNOWLEDGE SEARCH
-                    </div>
+                        <span class="mode-option-text">
 
+                            <strong>
+                                Direct AI
+                            </strong>
 
-                    <h2>
-                        Ask <span>Noxora</span>
-                    </h2>
+                            <small>
+                                Claude
+                            </small>
 
+                        </span>
 
-                    <p>
-                        Search your knowledge base with AI-powered
-                        answers grounded in your documents.
-                    </p>
+                    </button>
+
 
                 </div>
 
 
                 <!-- =================================================
-                     SEARCH AREA
-                     IMPORTANT: THIS STAYS ABOVE RESULTS
+                     QUESTION
                 ================================================== -->
 
-                <div class="search-area">
+                <form
+                    id="questionForm"
+                    class="question-form"
+                >
 
-                    <!-- MODE SELECTOR -->
 
                     <div
-                        class="mode-toggle"
-                        id="modeToggle"
-                        role="group"
-                        aria-label="AI response mode"
+                        id="questionBox"
+                        class="question-box"
                     >
 
-                        <button
-                            type="button"
-                            class="mode-option active"
-                            data-mode="rag"
-                            aria-pressed="true"
-                        >
 
-                            <span class="mode-option-icon">
-                                ◈
-                            </span>
+                        <div class="input-icon">
+                            ⌕
+                        </div>
 
-                            <span class="mode-option-text">
 
-                                <strong>
-                                    RAG
-                                </strong>
-
-                                <small>
-                                    Knowledge Base
-                                </small>
-
-                            </span>
-
-                        </button>
+                        <textarea
+                            id="questionInput"
+                            rows="1"
+                            maxlength="2000"
+                            placeholder="Ask a question about your documents..."
+                            autocomplete="off"
+                        ></textarea>
 
 
                         <button
-                            type="button"
-                            class="mode-option"
-                            data-mode="direct"
-                            aria-pressed="false"
+                            id="askButton"
+                            type="submit"
+                            class="ask-button"
                         >
 
-                            <span class="mode-option-icon">
-                                ✦
+                            <span id="askButtonText">
+                                Ask Noxora
                             </span>
 
-                            <span class="mode-option-text">
-
-                                <strong>
-                                    Direct AI
-                                </strong>
-
-                                <small>
-                                    Claude
-                                </small>
-
-                            </span>
-
-                        </button>
-
-                    </div>
-
-
-                    <!-- QUESTION FORM -->
-
-                    <form
-                        id="questionForm"
-                        class="question-form"
-                    >
-
-                        <div
-                            id="questionBox"
-                            class="question-box"
-                        >
-
-                            <div class="input-icon">
-                                ⌕
-                            </div>
-
-
-                            <textarea
-                                id="questionInput"
-                                rows="1"
-                                maxlength="2000"
-                                placeholder="Ask a question about your documents..."
-                                autocomplete="off"
-                            ></textarea>
-
-
-                            <button
-                                id="askButton"
-                                type="submit"
-                                class="ask-button"
+                            <span
+                                id="askButtonIcon"
+                                class="ask-button-icon"
                             >
+                                ↑
+                            </span>
 
-                                <span id="askButtonText">
-                                    Ask Noxora
-                                </span>
+                        </button>
 
-                                <span
-                                    id="askButtonIcon"
-                                    class="ask-button-icon"
-                                >
-                                    ↑
-                                </span>
-
-                            </button>
-
-                        </div>
-
-
-                        <!-- VALIDATION ERROR -->
-
-                        <div
-                            id="inputError"
-                            class="input-error hidden"
-                            role="alert"
-                            aria-live="polite"
-                        >
-
-                            <div class="input-error-icon">
-                                !
-                            </div>
-
-                            <div class="input-error-content">
-
-                                <strong id="inputErrorTitle">
-                                    Question required
-                                </strong>
-
-                                <span id="inputErrorMessage">
-                                    Please enter a question before asking Noxora.
-                                </span>
-
-                            </div>
-
-                        </div>
-
-                    </form>
-
-
-                    <div class="input-footer">
-
-                        <span>
-                            Enter to ask
-                        </span>
-
-                        <span class="footer-separator">
-                            •
-                        </span>
-
-                        <span>
-                            Shift + Enter for new line
-                        </span>
-
-                        <span class="footer-separator">
-                            •
-                        </span>
-
-                        <span>
-                            Max 2,000 characters
-                        </span>
 
                     </div>
+
+
+                    <!-- INPUT ERROR -->
+
+                    <div
+                        id="inputError"
+                        class="input-error hidden"
+                        role="alert"
+                        aria-live="polite"
+                    >
+
+                        <div class="input-error-icon">
+                            !
+                        </div>
+
+                        <div class="input-error-content">
+
+                            <strong id="inputErrorTitle">
+                                Question required
+                            </strong>
+
+                            <span id="inputErrorMessage">
+                                Please enter a question before asking Noxora.
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                </form>
+
+
+                <div class="input-footer">
+
+                    <span>
+                        Enter to ask
+                    </span>
+
+                    <span class="footer-separator">
+                        •
+                    </span>
+
+                    <span>
+                        Shift + Enter for new line
+                    </span>
+
+                    <span class="footer-separator">
+                        •
+                    </span>
+
+                    <span>
+                        Max 2,000 characters
+                    </span>
 
                 </div>
 
 
                 <!-- =================================================
-                     ANSWER
+                     UPLOAD PDF
                 ================================================== -->
 
+                <div class="upload-panel">
+
+
+                    <div class="upload-header">
+
+                        <div class="upload-header-icon">
+                            +
+                        </div>
+
+
+                        <div class="upload-header-text">
+
+                            <strong>
+                                Add knowledge
+                            </strong>
+
+                            <span>
+                                Upload a PDF to your Knowledge Base
+                            </span>
+
+                        </div>
+
+
+                        <button
+                            id="uploadButton"
+                            type="button"
+                            class="upload-button"
+                        >
+
+                            <span>
+                                Upload PDF
+                            </span>
+
+                        </button>
+
+
+                        <input
+                            id="pdfInput"
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            hidden
+                        >
+
+                    </div>
+
+
+                    <div class="upload-help">
+
+                        <span>
+                            PDF only
+                        </span>
+
+                        <span>
+                            •
+                        </span>
+
+                        <span>
+                            Maximum 10 MB
+                        </span>
+
+                    </div>
+
+
+                    <!-- UPLOAD STATUS -->
+
+                    <div
+                        id="uploadStatus"
+                        class="upload-status hidden"
+                        role="status"
+                        aria-live="polite"
+                    >
+
+                        <div
+                            id="uploadStatusIcon"
+                            class="upload-status-icon"
+                        >
+                            ↑
+                        </div>
+
+
+                        <div class="upload-status-content">
+
+                            <strong id="uploadStatusTitle">
+                                Uploading PDF
+                            </strong>
+
+                            <span id="uploadStatusMessage">
+                                Preparing your document...
+                            </span>
+
+
+                            <div class="upload-progress">
+
+                                <div
+                                    id="uploadProgressBar"
+                                    class="upload-progress-bar"
+                                ></div>
+
+                            </div>
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+            <!-- =================================================
+                 ANSWER
+            ================================================== -->
+
+            <div
+                id="answerSection"
+                class="answer-section hidden"
+            >
+
+
+                <div class="result-heading">
+
+
+                    <div>
+
+                        <span class="result-label">
+                            RESPONSE
+                        </span>
+
+                        <h3>
+                            Noxora's Answer
+                        </h3>
+
+                    </div>
+
+
+                    <div class="answer-badges">
+
+                        <div
+                            id="answerModeBadge"
+                            class="mode-badge"
+                        >
+                            KNOWLEDGE BASE
+                        </div>
+
+
+                        <div
+                            id="cacheBadge"
+                            class="cache-badge hidden"
+                        >
+                            CACHED
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="answer-card">
+
+                    <div
+                        id="answerContent"
+                        class="answer-content"
+                    ></div>
+
+                </div>
+
+
+                <!-- SOURCES -->
+
                 <div
-                    id="answerSection"
-                    class="answer-section hidden"
+                    id="sourcesSection"
+                    class="sources-section hidden"
                 >
 
-                    <div class="result-heading">
+
+                    <div class="sources-heading">
 
                         <div>
 
                             <span class="result-label">
-                                RESPONSE
+                                GROUNDED SOURCES
                             </span>
 
                             <h3>
-                                Noxora's Answer
+                                References
                             </h3>
 
                         </div>
 
-
-                        <div class="answer-badges">
-
-                            <div
-                                id="answerModeBadge"
-                                class="mode-badge"
-                            >
-                                KNOWLEDGE BASE
-                            </div>
-
-                            <div
-                                id="cacheBadge"
-                                class="cache-badge hidden"
-                            >
-                                CACHED
-                            </div>
-
-                        </div>
-
                     </div>
 
-
-                    <div class="answer-card">
-
-                        <div
-                            id="answerContent"
-                            class="answer-content"
-                        ></div>
-
-                    </div>
-
-
-                    <!-- SOURCES -->
 
                     <div
-                        id="sourcesSection"
-                        class="sources-section hidden"
-                    >
+                        id="sourcesList"
+                        class="sources-list"
+                    ></div>
 
-                        <div class="sources-heading">
-
-                            <div>
-
-                                <span class="result-label">
-                                    GROUNDED SOURCES
-                                </span>
-
-                                <h3>
-                                    References
-                                </h3>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            id="sourcesList"
-                            class="sources-list"
-                        ></div>
-
-                    </div>
 
                 </div>
 
 
-            </section>
-
-        </main>
-
-    </div>
+            </div>
 
 
-    <script src="script.js"></script>
+        </section>
+
+
+    </main>
+
+
+</div>
+
+
+<script src="script.js"></script>
+
 
 </body>
 
