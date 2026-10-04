@@ -984,8 +984,7 @@ def lambda_handler(
         )
 
 
-    question =
-        event["question"]
+question = event["question"]
 
 
     if not isinstance(
