@@ -9,51 +9,25 @@ from datetime import datetime, timezone
 from botocore.exceptions import ClientError
 
 
-# =====================================================
-# ENVIRONMENT VARIABLES
-# =====================================================
-
-AWS_REGION = os.environ.get(
-    "AWS_REGION",
-    "us-east-1"
-)
-
-KNOWLEDGE_BASE_ID = os.environ[
-    "KNOWLEDGE_BASE_ID"
-]
-
-MODEL_ID = os.environ[
-    "MODEL_ID"
-]
-
-DYNAMODB_TABLE = os.environ[
-    "DYNAMODB_TABLE"
-]
-
-REDIS_ENDPOINT = os.environ[
-    "REDIS_ENDPOINT"
-]
-
-
-# =====================================================
-# CONFIGURATION
-# =====================================================
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
+MODEL_ID = os.environ["MODEL_ID"]
+DYNAMODB_TABLE = os.environ["DYNAMODB_TABLE"]
+REDIS_ENDPOINT = os.environ["REDIS_ENDPOINT"]
 
 CACHE_TTL = 3600
 
 
-# =====================================================
+# ---------------------------------------------------------
 # AWS CLIENTS
-# =====================================================
+# ---------------------------------------------------------
 
 dynamodb = boto3.resource(
     "dynamodb",
     region_name=AWS_REGION
 )
 
-history_table = dynamodb.Table(
-    DYNAMODB_TABLE
-)
+history_table = dynamodb.Table(DYNAMODB_TABLE)
 
 
 redis_client = redis.Redis(
@@ -76,41 +50,34 @@ bedrock_agent_client = boto3.client(
 )
 
 
-# =====================================================
+# ---------------------------------------------------------
 # CORS RESPONSE
-# =====================================================
+# ---------------------------------------------------------
 
 def cors_response(status_code, body):
-
     return {
         "statusCode": status_code,
-
         "headers": {
             "Access-Control-Allow-Origin": "*",
-
-            "Access-Control-Allow-Headers":
-                "Content-Type,X-Amz-Date,Authorization,"
-                "X-Api-Key,X-Amz-Security-Token",
-
-            "Access-Control-Allow-Methods":
-                "OPTIONS,GET,POST"
+            "Access-Control-Allow-Headers": (
+                "Content-Type,"
+                "X-Amz-Date,"
+                "Authorization,"
+                "X-Api-Key,"
+                "X-Amz-Security-Token"
+            ),
+            "Access-Control-Allow-Methods": "OPTIONS,GET,POST"
         },
-
         "body": json.dumps(body)
     }
 
 
-# =====================================================
-# REDIS CACHE KEY
-# =====================================================
+# ---------------------------------------------------------
+# REDIS CACHE
+# ---------------------------------------------------------
 
 def get_cache_key(question: str):
-
-    normalized_question = (
-        question
-        .strip()
-        .lower()
-    )
+    normalized_question = question.strip().lower()
 
     question_hash = hashlib.sha256(
         normalized_question.encode("utf-8")
@@ -119,50 +86,25 @@ def get_cache_key(question: str):
     return f"qa:{question_hash}"
 
 
-# =====================================================
-# GET CACHED ANSWER
-# =====================================================
-
 def get_cached_answer(question: str):
-
     try:
+        cache_key = get_cache_key(question)
 
-        cache_key = get_cache_key(
-            question
-        )
-
-        cached_data = redis_client.get(
-            cache_key
-        )
+        cached_data = redis_client.get(cache_key)
 
         if cached_data:
-
-            return json.loads(
-                cached_data
-            )
+            return json.loads(cached_data)
 
         return None
 
     except Exception as e:
-
-        print(
-            f"Redis GET error: {str(e)}"
-        )
-
+        print(f"Redis GET error: {str(e)}")
         return None
 
 
-# =====================================================
-# SAVE ANSWER TO CACHE
-# =====================================================
-
 def cache_answer(question: str, result: dict):
-
     try:
-
-        cache_key = get_cache_key(
-            question
-        )
+        cache_key = get_cache_key(question)
 
         redis_client.set(
             cache_key,
@@ -170,32 +112,22 @@ def cache_answer(question: str, result: dict):
             ex=CACHE_TTL
         )
 
-        print(
-            f"Cached answer with key: {cache_key}"
-        )
+        print(f"Cached answer with key: {cache_key}")
 
     except Exception as e:
-
-        print(
-            f"Redis SET error: {str(e)}"
-        )
+        print(f"Redis SET error: {str(e)}")
 
 
-# =====================================================
-# QUERY KNOWLEDGE BASE
-# =====================================================
+# ---------------------------------------------------------
+# BEDROCK RAG
+# ---------------------------------------------------------
 
 def query_knowledge_base(question: str):
 
     try:
 
-        # -------------------------------------------------
-        # CHECK CACHE
-        # -------------------------------------------------
-
-        cached_result = get_cached_answer(
-            question
-        )
+        # Check Redis first
+        cached_result = get_cached_answer(question)
 
         if cached_result:
 
@@ -209,39 +141,24 @@ def query_knowledge_base(question: str):
         print("CACHE MISS")
 
 
-        # -------------------------------------------------
-        # RETRIEVE FROM KNOWLEDGE BASE
-        # -------------------------------------------------
-
+        # Retrieve from Knowledge Base
         response = bedrock_agent_client.retrieve(
-
-            knowledgeBaseId=
-                KNOWLEDGE_BASE_ID,
-
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
             retrievalQuery={
                 "text": question
             }
         )
 
 
-        # -------------------------------------------------
-        # EXTRACT CONTEXT
-        # -------------------------------------------------
-
         contexts = []
 
-
-        for result in response.get(
-            "retrievalResults",
-            []
-        ):
+        for result in response.get("retrievalResults", []):
 
             text = (
                 result
                 .get("content", {})
                 .get("text", "")
             )
-
 
             source = (
                 result
@@ -250,19 +167,13 @@ def query_knowledge_base(question: str):
                 .get("uri", "Unknown")
             )
 
-
-            contexts.append(
-                {
-                    "text": text,
-                    "source": source
-                }
-            )
+            contexts.append({
+                "text": text,
+                "source": source
+            })
 
 
-        # -------------------------------------------------
-        # COMBINE CONTEXT
-        # -------------------------------------------------
-
+        # Combine retrieved context
         context_text = "\n\n".join(
             [
                 context["text"]
@@ -271,10 +182,7 @@ def query_knowledge_base(question: str):
         )
 
 
-        # -------------------------------------------------
-        # CLAUDE PROMPT
-        # -------------------------------------------------
-
+        # Claude prompt
         prompt = f"""
 Use the following context from documents to answer the question.
 
@@ -292,20 +200,13 @@ Answer:
 """
 
 
-        # -------------------------------------------------
-        # CLAUDE REQUEST
-        # -------------------------------------------------
-
         request_body = {
 
-            "anthropic_version":
-                "bedrock-2023-05-31",
+            "anthropic_version": "bedrock-2023-05-31",
 
-            "max_tokens":
-                1000,
+            "max_tokens": 1000,
 
-            "temperature":
-                0.7,
+            "temperature": 0.7,
 
             "messages": [
                 {
@@ -316,63 +217,38 @@ Answer:
         }
 
 
-        response_claude = (
-            bedrock_client.invoke_model(
+        # Call Claude
+        response_claude = bedrock_client.invoke_model(
 
-                modelId=MODEL_ID,
+            modelId=MODEL_ID,
 
-                contentType=
-                    "application/json",
+            contentType="application/json",
 
-                accept=
-                    "application/json",
+            accept="application/json",
 
-                body=json.dumps(
-                    request_body
-                )
-            )
+            body=json.dumps(request_body)
         )
 
-
-        # -------------------------------------------------
-        # READ CLAUDE RESPONSE
-        # -------------------------------------------------
 
         response_body = json.loads(
-            response_claude[
-                "body"
-            ].read()
+            response_claude["body"].read()
         )
 
 
-        answer = (
-            response_body[
-                "content"
-            ][0]["text"]
-        )
+        answer = response_body["content"][0]["text"]
 
-
-        # -------------------------------------------------
-        # CREATE RESULT
-        # -------------------------------------------------
 
         result = {
 
-            "answer":
-                answer,
+            "answer": answer,
 
-            "citations":
-                contexts,
+            "citations": contexts,
 
-            "cache":
-                "miss"
+            "cache": "miss"
         }
 
 
-        # -------------------------------------------------
-        # SAVE TO CACHE
-        # -------------------------------------------------
-
+        # Save in Redis
         cache_answer(
             question,
             result
@@ -390,36 +266,54 @@ Answer:
 
         error_message = str(e)
 
+        print(
+            f"Bedrock error: "
+            f"{error_code} - {error_message}"
+        )
 
         return {
 
-            "answer":
-                f"Error: {error_code} - "
-                f"{error_message}",
+            "answer": (
+                f"Error: "
+                f"{error_code} - "
+                f"{error_message}"
+            ),
 
             "citations": [],
 
-            "cache":
-                "error"
+            "cache": "error"
         }
 
 
-# =====================================================
-# DIRECT CLAUDE QUERY
-# =====================================================
+    except Exception as e:
+
+        print(
+            f"Knowledge Base error: {str(e)}"
+        )
+
+        return {
+
+            "answer": f"Error: {str(e)}",
+
+            "citations": [],
+
+            "cache": "error"
+        }
+
+
+# ---------------------------------------------------------
+# DIRECT CLAUDE
+# ---------------------------------------------------------
 
 def query_claude_directly(question: str):
 
     request_body = {
 
-        "anthropic_version":
-            "bedrock-2023-05-31",
+        "anthropic_version": "bedrock-2023-05-31",
 
-        "max_tokens":
-            1000,
+        "max_tokens": 1000,
 
-        "temperature":
-            0.7,
+        "temperature": 0.7,
 
         "messages": [
             {
@@ -432,36 +326,24 @@ def query_claude_directly(question: str):
 
     try:
 
-        response = (
-            bedrock_client.invoke_model(
+        response = bedrock_client.invoke_model(
 
-                modelId=MODEL_ID,
+            modelId=MODEL_ID,
 
-                contentType=
-                    "application/json",
+            contentType="application/json",
 
-                accept=
-                    "application/json",
+            accept="application/json",
 
-                body=json.dumps(
-                    request_body
-                )
-            )
+            body=json.dumps(request_body)
         )
 
 
         response_body = json.loads(
-            response[
-                "body"
-            ].read()
+            response["body"].read()
         )
 
 
-        return (
-            response_body[
-                "content"
-            ][0]["text"]
-        )
+        return response_body["content"][0]["text"]
 
 
     except ClientError as e:
@@ -472,9 +354,14 @@ def query_claude_directly(question: str):
         )
 
 
-# =====================================================
-# SAVE QUERY HISTORY
-# =====================================================
+    except Exception as e:
+
+        return f"Error calling Claude: {str(e)}"
+
+
+# ---------------------------------------------------------
+# DYNAMODB QUERY HISTORY
+# ---------------------------------------------------------
 
 def save_query_history(
     question,
@@ -487,40 +374,30 @@ def save_query_history(
 
         Item={
 
-            "query_id":
-                str(uuid.uuid4()),
+            "query_id": str(uuid.uuid4()),
 
-            "timestamp":
+            "timestamp": (
                 datetime
                 .now(timezone.utc)
-                .isoformat(),
+                .isoformat()
+            ),
 
-            "question":
-                question,
+            "question": question,
 
-            "answer":
-                answer,
+            "answer": answer,
 
-            "mode":
-                mode,
+            "mode": mode,
 
-            "citations":
-                citations
+            "citations": citations
         }
     )
 
-
-# =====================================================
-# GET QUERY HISTORY
-# =====================================================
 
 def get_query_history():
 
     try:
 
-        print(
-            "Fetching query history..."
-        )
+        print("Fetching query history...")
 
 
         response = history_table.scan(
@@ -534,17 +411,13 @@ def get_query_history():
         )
 
 
-        # -------------------------------------------------
-        # SORT NEWEST FIRST
-        # -------------------------------------------------
-
+        # Newest first
         items.sort(
 
-            key=lambda x:
-                x.get(
-                    "timestamp",
-                    ""
-                ),
+            key=lambda x: x.get(
+                "timestamp",
+                ""
+            ),
 
             reverse=True
         )
@@ -561,8 +434,7 @@ def get_query_history():
             200,
 
             {
-                "history":
-                    items
+                "history": items
             }
         )
 
@@ -588,8 +460,7 @@ def get_query_history():
             500,
 
             {
-                "error":
-                    error_message
+                "error": error_message
             }
         )
 
@@ -606,34 +477,32 @@ def get_query_history():
             500,
 
             {
-                "error":
-                    str(e)
+                "error": str(e)
             }
         )
 
 
-# =====================================================
+# ---------------------------------------------------------
 # LAMBDA HANDLER
-# =====================================================
+# ---------------------------------------------------------
 
 def lambda_handler(event, context):
 
-    print(
-        "Received event:"
-    )
+    print("Received event:")
 
     print(
-        json.dumps(event)
+        json.dumps(
+            event,
+            default=str
+        )
     )
 
 
-    # =================================================
-    # CORS PREFLIGHT
-    # =================================================
+    # -----------------------------------------------------
+    # OPTIONS / CORS
+    # -----------------------------------------------------
 
-    if event.get(
-        "httpMethod"
-    ) == "OPTIONS":
+    if event.get("httpMethod") == "OPTIONS":
 
         return cors_response(
 
@@ -641,42 +510,41 @@ def lambda_handler(event, context):
 
             {
                 "message":
-                    "CORS preflight successful"
+                "CORS preflight successful"
             }
         )
 
 
-    # =================================================
-    # GET /history
-    # =================================================
+    # -----------------------------------------------------
+    # GET /query/history
+    # -----------------------------------------------------
 
-    if event.get(
-        "httpMethod"
-    ) == "GET":
+    if event.get("httpMethod") == "GET":
 
         return get_query_history()
 
 
-    # =================================================
-    # PARSE REQUEST BODY
-    # =================================================
+    # -----------------------------------------------------
+    # PROCESS REQUEST BODY
+    # -----------------------------------------------------
 
-    if "body" in event:
+    # IMPORTANT:
+    # Only process body when it actually exists.
+    # GET requests can have body=None.
+
+    if (
+        "body" in event
+        and event["body"] is not None
+    ):
 
         body = event["body"]
 
 
-        if isinstance(
-            body,
-            str
-        ):
+        if isinstance(body, str):
 
             try:
 
-                body = json.loads(
-                    body
-                )
-
+                body = json.loads(body)
 
             except json.JSONDecodeError:
 
@@ -686,17 +554,19 @@ def lambda_handler(event, context):
 
                     {
                         "error":
-                            "Invalid JSON body"
+                        "Invalid JSON body"
                     }
                 )
 
 
-        event = body
+        if body is not None:
+
+            event = body
 
 
-    # =================================================
-    # VALIDATE QUESTION
-    # =================================================
+    # -----------------------------------------------------
+    # QUESTION VALIDATION
+    # -----------------------------------------------------
 
     if "question" not in event:
 
@@ -706,14 +576,12 @@ def lambda_handler(event, context):
 
             {
                 "error":
-                    "Missing required field: question"
+                "Missing required field: question"
             }
         )
 
 
-    question = event[
-        "question"
-    ]
+    question = event["question"]
 
 
     mode = event.get(
@@ -722,9 +590,18 @@ def lambda_handler(event, context):
     )
 
 
-    # =================================================
-    # EMPTY QUESTION
-    # =================================================
+    if not isinstance(question, str):
+
+        return cors_response(
+
+            400,
+
+            {
+                "error":
+                "Question must be a string"
+            }
+        )
+
 
     if not question.strip():
 
@@ -734,14 +611,14 @@ def lambda_handler(event, context):
 
             {
                 "error":
-                    "Question cannot be empty"
+                "Question cannot be empty"
             }
         )
 
 
-    # =================================================
+    # -----------------------------------------------------
     # RAG MODE
-    # =================================================
+    # -----------------------------------------------------
 
     if mode == "rag":
 
@@ -750,29 +627,17 @@ def lambda_handler(event, context):
         )
 
 
-        # -------------------------------------------------
-        # SAVE HISTORY
-        # -------------------------------------------------
-
         save_query_history(
 
             question=question,
 
-            answer=result[
-                "answer"
-            ],
+            answer=result["answer"],
 
             mode=mode,
 
-            citations=result[
-                "citations"
-            ]
+            citations=result["citations"]
         )
 
-
-        # -------------------------------------------------
-        # RETURN RESPONSE
-        # -------------------------------------------------
 
         return cors_response(
 
@@ -780,34 +645,25 @@ def lambda_handler(event, context):
 
             {
 
-                "question":
-                    question,
+                "question": question,
 
-                "mode":
-                    "rag",
+                "mode": "rag",
 
-                "answer":
-                    result[
-                        "answer"
-                    ],
+                "answer": result["answer"],
 
-                "citations":
-                    result[
-                        "citations"
-                    ],
+                "citations": result["citations"],
 
-                "cache":
-                    result.get(
-                        "cache",
-                        "unknown"
-                    )
+                "cache": result.get(
+                    "cache",
+                    "unknown"
+                )
             }
         )
 
 
-    # =================================================
+    # -----------------------------------------------------
     # DIRECT MODE
-    # =================================================
+    # -----------------------------------------------------
 
     else:
 
@@ -815,10 +671,6 @@ def lambda_handler(event, context):
             question
         )
 
-
-        # -------------------------------------------------
-        # SAVE HISTORY
-        # -------------------------------------------------
 
         save_query_history(
 
@@ -832,26 +684,18 @@ def lambda_handler(event, context):
         )
 
 
-        # -------------------------------------------------
-        # RETURN RESPONSE
-        # -------------------------------------------------
-
         return cors_response(
 
             200,
 
             {
 
-                "question":
-                    question,
+                "question": question,
 
-                "mode":
-                    "direct",
+                "mode": "direct",
 
-                "answer":
-                    answer,
+                "answer": answer,
 
-                "cache":
-                    "not_used"
+                "cache": "not_used"
             }
         )
