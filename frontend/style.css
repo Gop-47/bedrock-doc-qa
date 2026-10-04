@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+
 :root {
     --bg: #05070d;
     --bg-soft: #090d16;
@@ -575,6 +576,8 @@ body::before {
 
     justify-content: space-between;
 
+    gap: 15px;
+
     margin-bottom: 11px;
 }
 
@@ -588,23 +591,116 @@ body::before {
 }
 
 
-.rag-badge {
-    padding: 5px 8px;
+/* =====================================================
+   MODE TOGGLE
+===================================================== */
+
+.mode-toggle {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 2px;
+
+    padding: 3px;
+
+    border:
+        1px solid rgba(255,255,255,.075);
+
+    border-radius: 9px;
+
+    background:
+        rgba(3,6,12,.72);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+
+.mode-option {
+    min-width: 55px;
+
+    height: 25px;
+
+    padding:
+        0 9px;
+
+    border: none;
 
     border-radius: 6px;
 
     background:
-        rgba(99,102,241,.08);
+        transparent;
 
-    color: #818cf8;
+    color: #526176;
+
+    font-family: inherit;
 
     font-size: 8px;
 
-    font-weight: 600;
+    font-weight: 700;
 
-    letter-spacing: .7px;
+    letter-spacing: .45px;
+
+    cursor: pointer;
+
+    transition:
+        background .2s ease,
+        color .2s ease,
+        box-shadow .2s ease;
 }
 
+
+.mode-option:hover {
+    color:
+        #94a3b8;
+}
+
+
+.mode-option.active {
+    color:
+        #ddd6fe;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(124,58,237,.25),
+            rgba(99,102,241,.17)
+        );
+
+    box-shadow:
+        0 3px 12px rgba(124,58,237,.15);
+}
+
+
+.mode-option[data-mode="direct"].active {
+    color:
+        #bfdbfe;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(59,130,246,.20),
+            rgba(99,102,241,.15)
+        );
+
+    box-shadow:
+        0 3px 12px rgba(59,130,246,.12);
+}
+
+
+.mode-option:focus-visible {
+    outline:
+        2px solid rgba(167,139,250,.5);
+
+    outline-offset:
+        1px;
+}
+
+
+/* =====================================================
+   TEXTAREA
+===================================================== */
 
 textarea {
     position: relative;
@@ -657,6 +753,10 @@ textarea:focus {
         rgba(124,58,237,.065);
 }
 
+
+/* =====================================================
+   QUERY FOOTER
+===================================================== */
 
 .query-footer {
     display: flex;
@@ -1014,7 +1114,27 @@ textarea:focus {
 }
 
 
-/* History restored result */
+.rag-status {
+    color: #a78bfa;
+
+    background:
+        rgba(124,58,237,.08);
+
+    border:
+        1px solid rgba(124,58,237,.12);
+}
+
+
+.direct-status {
+    color: #93c5fd;
+
+    background:
+        rgba(59,130,246,.08);
+
+    border:
+        1px solid rgba(59,130,246,.12);
+}
+
 
 .history-result-rag {
     color: #a78bfa;
@@ -1358,10 +1478,6 @@ textarea:focus {
 }
 
 
-/* =====================================================
-   HISTORY HEADER
-===================================================== */
-
 .history-header {
     display: flex;
 
@@ -1608,10 +1724,6 @@ textarea:focus {
 }
 
 
-/* =====================================================
-   HISTORY TIME
-===================================================== */
-
 .history-time {
     color:
         #475569;
@@ -1621,10 +1733,6 @@ textarea:focus {
     white-space: nowrap;
 }
 
-
-/* =====================================================
-   HISTORY QUESTION
-===================================================== */
 
 .history-question {
     margin-bottom: 6px;
@@ -1639,10 +1747,6 @@ textarea:focus {
     line-height: 1.55;
 }
 
-
-/* =====================================================
-   HISTORY ANSWER
-===================================================== */
 
 .history-answer {
     color:
@@ -1665,10 +1769,6 @@ textarea:focus {
         hidden;
 }
 
-
-/* =====================================================
-   HISTORY META
-===================================================== */
 
 .history-meta {
     display: flex;
@@ -1938,6 +2038,26 @@ textarea:focus {
         padding: 13px;
 
         border-radius: 17px;
+    }
+
+
+    .query-header {
+        align-items: flex-start;
+    }
+
+
+    .query-title {
+        padding-top: 6px;
+    }
+
+
+    .mode-option {
+        min-width: 50px;
+
+        padding:
+            0 7px;
+
+        font-size: 7px;
     }
 
 
