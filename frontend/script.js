@@ -1,46 +1,37 @@
 const API_URL =
     "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
 
+console.log("NOXORA SCRIPT LOADED");
 
 /* =====================================================
-   ELEMENTS
+   GET ELEMENTS
 ===================================================== */
 
-const questionInput =
-    document.getElementById("questionInput");
+const questionInput = document.getElementById("questionInput");
+const askButton = document.getElementById("askButton");
 
-const askButton =
-    document.getElementById("askButton");
+const loadingCard = document.getElementById("loadingCard");
+const answerSection = document.getElementById("answerSection");
+const answerText = document.getElementById("answerText");
 
-const loadingCard =
-    document.getElementById("loadingCard");
+const cacheStatus = document.getElementById("cacheStatus");
+const copyButton = document.getElementById("copyButton");
 
-const answerSection =
-    document.getElementById("answerSection");
+const sourcesSection = document.getElementById("sourcesSection");
+const sourcesList = document.getElementById("sourcesList");
+const sourcesCount = document.getElementById("sourcesCount");
 
-const answerText =
-    document.getElementById("answerText");
+const errorCard = document.getElementById("errorCard");
+const errorMessage = document.getElementById("errorMessage");
 
-const cacheStatus =
-    document.getElementById("cacheStatus");
 
-const copyButton =
-    document.getElementById("copyButton");
+/* =====================================================
+   CHECK HTML ELEMENTS
+===================================================== */
 
-const sourcesSection =
-    document.getElementById("sourcesSection");
-
-const sourcesList =
-    document.getElementById("sourcesList");
-
-const sourcesCount =
-    document.getElementById("sourcesCount");
-
-const errorCard =
-    document.getElementById("errorCard");
-
-const errorMessage =
-    document.getElementById("errorMessage");
+console.log("Question input:", questionInput);
+console.log("Ask button:", askButton);
+console.log("Answer section:", answerSection);
 
 
 /* =====================================================
@@ -54,14 +45,81 @@ hideElement(errorCard);
 
 
 /* =====================================================
+   ASK BUTTON
+===================================================== */
+
+if (askButton) {
+
+    askButton.addEventListener("click", function () {
+
+        console.log("ASK BUTTON CLICKED");
+
+        askQuestion();
+
+    });
+
+} else {
+
+    console.error(
+        "ERROR: askButton element was not found."
+    );
+}
+
+
+/* =====================================================
+   ENTER KEY
+===================================================== */
+
+if (questionInput) {
+
+    questionInput.addEventListener(
+        "keydown",
+        function (event) {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                console.log(
+                    "ENTER KEY PRESSED"
+                );
+
+                askQuestion();
+            }
+
+        }
+    );
+
+}
+
+
+/* =====================================================
    ASK QUESTION
 ===================================================== */
 
 async function askQuestion() {
 
+    console.log("askQuestion() started");
+
+    if (!questionInput) {
+
+        console.error(
+            "questionInput not found."
+        );
+
+        return;
+    }
+
     const question =
         questionInput.value.trim();
 
+
+    /* -------------------------------------------------
+       EMPTY QUESTION
+    ------------------------------------------------- */
 
     if (!question) {
 
@@ -73,20 +131,39 @@ async function askQuestion() {
     }
 
 
+    /* -------------------------------------------------
+       RESET UI
+    ------------------------------------------------- */
+
     hideElement(errorCard);
     hideElement(answerSection);
     hideElement(sourcesSection);
 
     showElement(loadingCard);
 
+    if (askButton) {
 
-    askButton.disabled = true;
+        askButton.disabled = true;
+        askButton.textContent =
+            "Thinking...";
+    }
 
-    askButton.textContent =
-        "Thinking...";
 
+    /* -------------------------------------------------
+       API REQUEST
+    ------------------------------------------------- */
 
     try {
+
+        console.log(
+            "Sending request to Noxora API..."
+        );
+
+        console.log(
+            "Question:",
+            question
+        );
+
 
         const response =
             await fetch(API_URL, {
@@ -109,15 +186,28 @@ async function askQuestion() {
             });
 
 
+        console.log(
+            "API HTTP status:",
+            response.status
+        );
+
+
+        /* -------------------------------------------------
+           CHECK HTTP RESPONSE
+        ------------------------------------------------- */
+
         if (!response.ok) {
 
             throw new Error(
                 "API request failed with status " +
                 response.status
             );
-
         }
 
+
+        /* -------------------------------------------------
+           READ RESPONSE
+        ------------------------------------------------- */
 
         const data =
             await response.json();
@@ -129,9 +219,9 @@ async function askQuestion() {
         );
 
 
-        /* =================================================
-           LAMBDA PROXY BODY
-        ================================================= */
+        /* -------------------------------------------------
+           API GATEWAY BODY HANDLING
+        ------------------------------------------------- */
 
         let result = data;
 
@@ -148,7 +238,7 @@ async function askQuestion() {
             } catch (error) {
 
                 console.error(
-                    "Failed to parse API body:",
+                    "Could not parse API body:",
                     error
                 );
 
@@ -156,6 +246,16 @@ async function askQuestion() {
 
         }
 
+
+        console.log(
+            "Processed result:",
+            result
+        );
+
+
+        /* -------------------------------------------------
+           API ERROR
+        ------------------------------------------------- */
 
         if (result.error) {
 
@@ -165,6 +265,10 @@ async function askQuestion() {
 
         }
 
+
+        /* -------------------------------------------------
+           DISPLAY RESULT
+        ------------------------------------------------- */
 
         displayAnswer(result);
 
@@ -176,12 +280,9 @@ async function askQuestion() {
             error
         );
 
-
         showError(
-
             error.message ||
             "Something went wrong. Please try again."
-
         );
 
 
@@ -190,10 +291,14 @@ async function askQuestion() {
         hideElement(loadingCard);
 
 
-        askButton.disabled = false;
+        if (askButton) {
 
-        askButton.textContent =
-            "Ask Noxora";
+            askButton.disabled = false;
+
+            askButton.textContent =
+                "Ask Noxora";
+
+        }
 
     }
 
@@ -206,6 +311,16 @@ async function askQuestion() {
 
 function displayAnswer(data) {
 
+    console.log(
+        "Displaying answer:",
+        data
+    );
+
+
+    /* -------------------------------------------------
+       ANSWER
+    ------------------------------------------------- */
+
     if (answerText) {
 
         answerText.textContent =
@@ -215,12 +330,14 @@ function displayAnswer(data) {
     }
 
 
-    showElement(answerSection);
+    showElement(
+        answerSection
+    );
 
 
-    /* =================================================
+    /* -------------------------------------------------
        CACHE STATUS
-    ================================================= */
+    ------------------------------------------------- */
 
     if (cacheStatus) {
 
@@ -254,9 +371,9 @@ function displayAnswer(data) {
     }
 
 
-    /* =================================================
+    /* -------------------------------------------------
        SOURCES
-    ================================================= */
+    ------------------------------------------------- */
 
     displaySources(
         data.citations || []
@@ -271,13 +388,11 @@ function displayAnswer(data) {
 
 function displaySources(citations) {
 
+    console.log(
+        "Displaying sources:",
+        citations
+    );
 
-    /*
-     * Safety check.
-     *
-     * If the HTML does not contain sourcesList,
-     * don't crash the entire application.
-     */
 
     if (!sourcesList) {
 
@@ -286,26 +401,22 @@ function displaySources(citations) {
         );
 
         return;
-
     }
 
 
     sourcesList.innerHTML = "";
 
 
-    /*
-     * sourcesCount is optional.
-     *
-     * We don't assume it exists.
-     */
-
     if (sourcesCount) {
 
-        sourcesCount.textContent =
-            "";
+        sourcesCount.textContent = "";
 
     }
 
+
+    /* -------------------------------------------------
+       NO SOURCES
+    ------------------------------------------------- */
 
     if (
         !citations ||
@@ -321,51 +432,27 @@ function displaySources(citations) {
     }
 
 
-    /* =================================================
-       REMOVE DUPLICATE DOCUMENTS
-    ================================================= */
+    /* -------------------------------------------------
+       REMOVE DUPLICATE SOURCES
+    ------------------------------------------------- */
 
     const uniqueSources = [];
 
-    const seenSources =
-        new Set();
+    const seenSources = new Set();
 
 
     citations.forEach(
-        (citation) => {
+        function (citation) {
 
             const source =
                 citation.source ||
                 "Unknown source";
 
 
-            let normalizedSource =
+            const normalizedSource =
                 source
                     .trim()
                     .toLowerCase();
-
-
-            try {
-
-                const url =
-                    new URL(source);
-
-
-                normalizedSource =
-                    (
-                        url.origin +
-                        url.pathname
-                    ).toLowerCase();
-
-
-            } catch (error) {
-
-                /*
-                 * If it isn't a valid URL,
-                 * use the normalized text.
-                 */
-
-            }
 
 
             if (
@@ -377,7 +464,6 @@ function displaySources(citations) {
                 seenSources.add(
                     normalizedSource
                 );
-
 
                 uniqueSources.push(
                     citation
@@ -394,35 +480,27 @@ function displaySources(citations) {
     );
 
 
-    /* =================================================
+    /* -------------------------------------------------
        SOURCE COUNT
-    ================================================= */
+    ------------------------------------------------- */
 
     if (sourcesCount) {
 
         sourcesCount.textContent =
-
             uniqueSources.length === 1
-
                 ? "1 source"
-
                 : uniqueSources.length +
                   " sources";
 
     }
 
 
-    /* =================================================
+    /* -------------------------------------------------
        CREATE SOURCE CARDS
-    ================================================= */
+    ------------------------------------------------- */
 
     uniqueSources.forEach(
-        (citation, index) => {
-
-
-            /* ================================
-               CARD
-            ================================= */
+        function (citation, index) {
 
             const sourceCard =
                 document.createElement(
@@ -433,9 +511,7 @@ function displaySources(citations) {
                 "source-card";
 
 
-            /* ================================
-               ICON
-            ================================= */
+            /* ICON */
 
             const icon =
                 document.createElement(
@@ -449,9 +525,7 @@ function displaySources(citations) {
                 "📄";
 
 
-            /* ================================
-               CONTENT
-            ================================= */
+            /* CONTENT */
 
             const content =
                 document.createElement(
@@ -462,9 +536,7 @@ function displaySources(citations) {
                 "source-content";
 
 
-            /* ================================
-               LABEL
-            ================================= */
+            /* SOURCE LABEL */
 
             const label =
                 document.createElement(
@@ -479,9 +551,7 @@ function displaySources(citations) {
                 (index + 1);
 
 
-            /* ================================
-               FILE NAME
-            ================================= */
+            /* FILE NAME */
 
             const name =
                 document.createElement(
@@ -533,14 +603,11 @@ function displaySources(citations) {
             name.textContent =
                 fileName;
 
-
             name.title =
                 sourceUrl;
 
 
-            /* ================================
-               DESCRIPTION
-            ================================= */
+            /* DESCRIPTION */
 
             const description =
                 document.createElement(
@@ -554,9 +621,7 @@ function displaySources(citations) {
                 "Retrieved from your Knowledge Base";
 
 
-            /* ================================
-               SOURCE TEXT
-            ================================= */
+            /* SOURCE TEXT */
 
             const sourceText =
                 document.createElement(
@@ -571,9 +636,7 @@ function displaySources(citations) {
                 "No source text available.";
 
 
-            /* ================================
-               VIEW BUTTON
-            ================================= */
+            /* EXPAND BUTTON */
 
             const expandButton =
                 document.createElement(
@@ -592,15 +655,15 @@ function displaySources(citations) {
 
             expandButton.addEventListener(
                 "click",
-                () => {
+                function () {
 
-                    const isHidden =
+                    const hidden =
                         sourceText.classList.contains(
                             "hidden"
                         );
 
 
-                    if (isHidden) {
+                    if (hidden) {
 
                         sourceText.classList.remove(
                             "hidden"
@@ -608,6 +671,7 @@ function displaySources(citations) {
 
                         expandButton.textContent =
                             "Hide source";
+
 
                     } else {
 
@@ -624,9 +688,7 @@ function displaySources(citations) {
             );
 
 
-            /* ================================
-               BUILD CARD
-            ================================= */
+            /* BUILD CONTENT */
 
             content.appendChild(
                 label
@@ -676,12 +738,14 @@ if (copyButton) {
 
     copyButton.addEventListener(
         "click",
-        async () => {
+        async function () {
 
             try {
 
                 await navigator.clipboard.writeText(
-                    answerText.textContent
+                    answerText
+                        ? answerText.textContent
+                        : ""
                 );
 
 
@@ -694,7 +758,7 @@ if (copyButton) {
 
 
                 setTimeout(
-                    () => {
+                    function () {
 
                         copyButton.textContent =
                             originalText;
@@ -720,52 +784,30 @@ if (copyButton) {
 
 
 /* =====================================================
-   ENTER KEY
-===================================================== */
-
-if (questionInput) {
-
-    questionInput.addEventListener(
-        "keydown",
-        (event) => {
-
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey
-            ) {
-
-                event.preventDefault();
-
-                askQuestion();
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   ERROR
+   ERROR MESSAGE
 ===================================================== */
 
 function showError(message) {
 
-    if (!errorMessage) {
+    console.error(
+        "Noxora error:",
+        message
+    );
 
-        console.error(
-            "Error:",
-            message
-        );
+
+    if (!errorCard) {
 
         return;
 
     }
 
 
-    errorMessage.textContent =
-        message;
+    if (errorMessage) {
+
+        errorMessage.textContent =
+            message;
+
+    }
 
 
     showElement(
@@ -776,12 +818,17 @@ function showError(message) {
 
 
 /* =====================================================
-   HELPERS
+   SHOW / HIDE HELPERS
 ===================================================== */
 
 function showElement(element) {
 
-    if (!element) return;
+    if (!element) {
+
+        return;
+
+    }
+
 
     element.classList.remove(
         "hidden"
@@ -792,10 +839,24 @@ function showElement(element) {
 
 function hideElement(element) {
 
-    if (!element) return;
+    if (!element) {
+
+        return;
+
+    }
+
 
     element.classList.add(
         "hidden"
     );
 
 }
+
+
+/* =====================================================
+   FINAL CHECK
+===================================================== */
+
+console.log(
+    "Noxora JavaScript initialization complete."
+);
