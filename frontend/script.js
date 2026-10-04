@@ -582,7 +582,7 @@ function displaySources(
 
 
             } catch (
-            error
+                error
             ) {
 
                 fileName =
@@ -641,7 +641,15 @@ function displaySources(
 
             expandButton.addEventListener(
                 "click",
-                function () {
+                function (event) {
+
+                    /*
+                     * Prevent the source click from
+                     * affecting parent interactions.
+                     */
+
+                    event.stopPropagation();
+
 
                     const hidden =
                         sourceText.classList.contains(
@@ -848,8 +856,8 @@ async function loadHistory() {
                 <br>
 
                 ${escapeHtml(
-            error.message
-        )}
+                    error.message
+                )}
 
             </div>
 
@@ -910,7 +918,10 @@ function renderHistory(
 
 
     history.forEach(
-        function (item) {
+        function (
+            item,
+            index
+        ) {
 
             const historyCard =
                 document.createElement(
@@ -919,6 +930,100 @@ function renderHistory(
 
             historyCard.className =
                 "history-card";
+
+
+            /*
+             * Make the card clickable.
+             */
+
+            historyCard.setAttribute(
+                "role",
+                "button"
+            );
+
+            historyCard.setAttribute(
+                "tabindex",
+                "0"
+            );
+
+
+            historyCard.setAttribute(
+                "aria-label",
+                "Open history entry"
+            );
+
+
+            /* -----------------------------------------
+               TOP ROW
+            ----------------------------------------- */
+
+            const top =
+                document.createElement(
+                    "div"
+                );
+
+            top.className =
+                "history-card-top";
+
+
+            /* -----------------------------------------
+               MODE
+            ----------------------------------------- */
+
+            const mode =
+                document.createElement(
+                    "span"
+                );
+
+
+            const normalizedMode =
+                String(
+                    item.mode ||
+                    "rag"
+                ).toLowerCase();
+
+
+            const isRag =
+                normalizedMode === "rag";
+
+
+            mode.className =
+                isRag
+                    ? "history-mode history-mode-rag"
+                    : "history-mode history-mode-direct";
+
+
+            mode.textContent =
+                isRag
+                    ? "KNOWLEDGE BASE"
+                    : "DIRECT AI";
+
+
+            /* -----------------------------------------
+               DATE
+            ----------------------------------------- */
+
+            const time =
+                document.createElement(
+                    "span"
+                );
+
+            time.className =
+                "history-time";
+
+            time.textContent =
+                formatDate(
+                    item.timestamp
+                );
+
+
+            top.appendChild(
+                mode
+            );
+
+            top.appendChild(
+                time
+            );
 
 
             /* -----------------------------------------
@@ -956,7 +1061,7 @@ function renderHistory(
 
 
             /* -----------------------------------------
-               META
+               SOURCE COUNT
             ----------------------------------------- */
 
             const meta =
@@ -968,47 +1073,103 @@ function renderHistory(
                 "history-meta";
 
 
-            const mode =
+            const sourceInfo =
                 document.createElement(
                     "span"
                 );
 
-            mode.className =
-                "history-mode";
-
-            mode.textContent =
-                (
-                    item.mode ||
-                    "rag"
-                ).toUpperCase();
+            sourceInfo.className =
+                "history-source-info";
 
 
-            const time =
+            if (isRag) {
+
+                const citations =
+                    Array.isArray(
+                        item.citations
+                    )
+                        ? item.citations
+                        : [];
+
+
+                const uniqueSourceNames =
+                    new Set();
+
+
+                citations.forEach(
+                    function (
+                        citation
+                    ) {
+
+                        if (
+                            citation &&
+                            citation.source
+                        ) {
+
+                            uniqueSourceNames.add(
+                                String(
+                                    citation.source
+                                )
+                                    .trim()
+                                    .toLowerCase()
+                            );
+
+                        }
+
+                    }
+                );
+
+
+                const sourceTotal =
+                    uniqueSourceNames.size;
+
+
+                sourceInfo.textContent =
+                    sourceTotal === 1
+                        ? "1 source"
+                        : sourceTotal +
+                          " sources";
+
+            } else {
+
+                sourceInfo.textContent =
+                    "No sources";
+
+            }
+
+
+            /* -----------------------------------------
+               OPEN LABEL
+            ----------------------------------------- */
+
+            const openLabel =
                 document.createElement(
                     "span"
                 );
 
-            time.className =
-                "history-time";
+            openLabel.className =
+                "history-open";
 
-            time.textContent =
-                formatDate(
-                    item.timestamp
-                );
+            openLabel.textContent =
+                "View →";
 
 
             meta.appendChild(
-                mode
+                sourceInfo
             );
 
             meta.appendChild(
-                time
+                openLabel
             );
 
 
             /* -----------------------------------------
                BUILD CARD
             ----------------------------------------- */
+
+            historyCard.appendChild(
+                top
+            );
 
             historyCard.appendChild(
                 question
@@ -1023,11 +1184,232 @@ function renderHistory(
             );
 
 
+            /* -----------------------------------------
+               CLICK HISTORY ENTRY
+            ----------------------------------------- */
+
+            historyCard.addEventListener(
+                "click",
+                function () {
+
+                    openHistoryEntry(
+                        item
+                    );
+
+                }
+            );
+
+
+            /* -----------------------------------------
+               KEYBOARD ACCESS
+            ----------------------------------------- */
+
+            historyCard.addEventListener(
+                "keydown",
+                function (event) {
+
+                    if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                    ) {
+
+                        event.preventDefault();
+
+                        openHistoryEntry(
+                            item
+                        );
+
+                    }
+
+                }
+            );
+
+
             historyList.appendChild(
                 historyCard
             );
 
         }
+    );
+
+}
+
+
+/* =====================================================
+   OPEN HISTORY ENTRY
+===================================================== */
+
+function openHistoryEntry(
+    item
+) {
+
+    if (!item) {
+
+        return;
+
+    }
+
+
+    console.log(
+        "Opening history entry:",
+        item
+    );
+
+
+    const question =
+        item.question ||
+        "";
+
+
+    const answer =
+        item.answer ||
+        "No answer available.";
+
+
+    const mode =
+        String(
+            item.mode ||
+            "rag"
+        ).toLowerCase();
+
+
+    const citations =
+        Array.isArray(
+            item.citations
+        )
+            ? item.citations
+            : [];
+
+
+    /* -----------------------------------------
+       RESTORE QUESTION
+    ----------------------------------------- */
+
+    if (questionInput) {
+
+        questionInput.value =
+            question;
+
+    }
+
+
+    /* -----------------------------------------
+       RESTORE ANSWER
+    ----------------------------------------- */
+
+    if (answerText) {
+
+        answerText.textContent =
+            answer;
+
+    }
+
+
+    showElement(
+        answerSection
+    );
+
+
+    /* -----------------------------------------
+       RESTORE MODE / CACHE STATUS
+    ----------------------------------------- */
+
+    if (cacheStatus) {
+
+        /*
+         * History doesn't store whether the
+         * original request was a cache hit.
+         *
+         * Therefore we clear the cache badge.
+         */
+
+        cacheStatus.textContent =
+            mode === "rag"
+                ? "HISTORY · RAG"
+                : "HISTORY · DIRECT";
+
+
+        cacheStatus.className =
+            mode === "rag"
+                ? "cache-status history-result-rag"
+                : "cache-status history-result-direct";
+
+    }
+
+
+    /* -----------------------------------------
+       RESTORE SOURCES
+    ----------------------------------------- */
+
+    if (mode === "rag") {
+
+        displaySources(
+            citations
+        );
+
+    } else {
+
+        hideElement(
+            sourcesSection
+        );
+
+
+        if (sourcesList) {
+
+            sourcesList.innerHTML =
+                "";
+
+        }
+
+
+        if (sourcesCount) {
+
+            sourcesCount.textContent =
+                "";
+
+        }
+
+    }
+
+
+    /* -----------------------------------------
+       CLOSE HISTORY
+    ----------------------------------------- */
+
+    hideElement(
+        historySection
+    );
+
+
+    /* -----------------------------------------
+       CLEAR OLD ERROR
+    ----------------------------------------- */
+
+    hideElement(
+        errorCard
+    );
+
+
+    /* -----------------------------------------
+       SCROLL TO ANSWER
+    ----------------------------------------- */
+
+    setTimeout(
+        function () {
+
+            if (answerSection) {
+
+                answerSection.scrollIntoView(
+                    {
+                        behavior: "smooth",
+                        block: "start"
+                    }
+                );
+
+            }
+
+        },
+        100
     );
 
 }
@@ -1056,6 +1438,17 @@ function formatDate(
             );
 
 
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return timestamp;
+
+        }
+
+
         return date.toLocaleString(
             "en-IN",
             {
@@ -1068,7 +1461,7 @@ function formatDate(
         );
 
     } catch (
-    error
+        error
     ) {
 
         return timestamp;
@@ -1087,7 +1480,10 @@ function escapeHtml(
 ) {
 
     return String(
-        value
+        value === null ||
+        value === undefined
+            ? ""
+            : value
     )
         .replace(
             /&/g,
@@ -1152,7 +1548,7 @@ if (copyButton) {
 
 
             } catch (
-            error
+                error
             ) {
 
                 console.error(
