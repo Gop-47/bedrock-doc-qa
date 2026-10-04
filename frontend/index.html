@@ -5,143 +5,176 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>
-        Noxora — AI Knowledge Assistant
-    </title>
+    <title>Noxora — AI Knowledge Assistant</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 
 </head>
 
 
 <body>
 
+    <div class="app-shell">
 
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
+        <!-- =================================================
+             SIDEBAR
+        ================================================== -->
 
-    <header class="header">
+        <aside class="sidebar">
 
-        <div class="container header-inner">
+            <div class="brand">
 
-
-            <!-- LOGO -->
-
-            <div class="logo">
-
-                <div class="logo-mark">
+                <div class="brand-icon">
                     N
                 </div>
 
-                <div class="logo-text">
+                <div>
 
-                    <div class="logo-title">
-                        NOXORA
-                    </div>
+                    <h1>Noxora</h1>
 
-                    <div class="logo-subtitle">
+                    <span>
                         AI Knowledge Assistant
-                    </div>
+                    </span>
 
                 </div>
 
             </div>
 
 
-            <!-- HEADER ACTIONS -->
+            <div class="sidebar-section">
 
-            <div class="header-actions">
+                <div class="section-title">
+                    Query History
+                </div>
 
-
-                <!-- HISTORY BUTTON -->
-
-                <button
-                    id="historyButton"
-                    class="history-button"
-                    type="button"
+                <div
+                    id="historyList"
+                    class="history-list"
                 >
-                    ◷ History
-                </button>
 
-
-                <!-- SYSTEM STATUS -->
-
-                <div class="status">
-
-                    <span class="status-dot"></span>
-
-                    System Online
+                    <div class="history-empty">
+                        No queries yet.
+                    </div>
 
                 </div>
-
 
             </div>
 
-
-        </div>
-
-    </header>
+        </aside>
 
 
+        <!-- =================================================
+             MAIN
+        ================================================== -->
 
-    <!-- =====================================================
-         MAIN
-    ====================================================== -->
+        <main class="main-content">
 
-    <main>
+            <header class="topbar">
 
-        <div class="container">
+                <div>
+
+                    <div class="status-indicator">
+
+                        <span class="status-dot"></span>
+
+                        Noxora Online
+
+                    </div>
+
+                </div>
+
+            </header>
 
 
-            <!-- =================================================
-                 HERO
-            ================================================== -->
+            <section class="chat-container">
 
-            <section class="hero">
+                <!-- HERO -->
 
-                <div class="hero-badge">
-                    ✦ AI KNOWLEDGE ASSISTANT
+                <div
+                    id="welcomeSection"
+                    class="welcome-section"
+                >
+
+                    <div class="welcome-icon">
+                        ✦
+                    </div>
+
+                    <h2>
+                        Ask Noxora
+                    </h2>
+
+                    <p>
+                        Ask questions about your knowledge base
+                        or use Direct AI for general questions.
+                    </p>
+
                 </div>
 
 
-                <h1>
+                <!-- ANSWER -->
 
-                    Ask your knowledge.
+                <div
+                    id="answerSection"
+                    class="answer-section hidden"
+                >
 
-                    <br>
+                    <div class="answer-header">
 
-                    Get intelligent answers.
+                        <div
+                            id="answerModeBadge"
+                            class="mode-badge"
+                        >
+                            KNOWLEDGE BASE
+                        </div>
 
-                </h1>
+                        <div
+                            id="cacheBadge"
+                            class="cache-badge hidden"
+                        >
+                            CACHE
+                        </div>
 
-
-                <p>
-
-                    Ask questions about your documents and
-                    get AI-powered answers with source citations.
-
-                </p>
-
-            </section>
-
-
-
-            <!-- =================================================
-                 QUERY CARD
-            ================================================== -->
-
-            <section class="query-card">
-
-
-                <div class="query-header">
-
-                    <div class="query-title">
-                        Ask a question
                     </div>
 
+
+                    <div
+                        id="answerContent"
+                        class="answer-content"
+                    ></div>
+
+
+                    <!-- SOURCES -->
+
+                    <div
+                        id="sourcesSection"
+                        class="sources-section hidden"
+                    >
+
+                        <div class="sources-title">
+                            Sources
+                        </div>
+
+                        <div
+                            id="sourcesList"
+                            class="sources-list"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- INPUT -->
+
+                <div class="input-area">
 
                     <!-- MODE SELECTOR -->
 
@@ -158,8 +191,18 @@
                             data-mode="rag"
                             aria-pressed="true"
                         >
+                            <span class="mode-option-icon">
+                                ◈
+                            </span>
+
                             RAG
+
+                            <span class="mode-option-subtitle">
+                                Knowledge Base
+                            </span>
+
                         </button>
+
 
                         <button
                             type="button"
@@ -167,323 +210,120 @@
                             data-mode="direct"
                             aria-pressed="false"
                         >
-                            Direct AI
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-
-                <textarea
-                    id="questionInput"
-                    placeholder="Ask something about your documents..."
-                    autocomplete="off"
-                ></textarea>
-
-
-
-                <div class="query-footer">
-
-
-                    <div class="input-hint" id="inputHint">
-
-                        Press Enter to ask
-                        ·
-                        Shift + Enter for new line
-
-                    </div>
-
-
-                    <button
-                        id="askButton"
-                        class="ask-button"
-                        type="button"
-                    >
-
-                        Ask Noxora
-
-                    </button>
-
-
-                </div>
-
-
-            </section>
-
-
-
-            <!-- =================================================
-                 FEATURES
-            ================================================== -->
-
-            <div class="features">
-
-
-                <div class="feature-pill">
-                    ✦ AI Powered
-                </div>
-
-
-                <div class="feature-pill">
-                    ◈ Knowledge Base
-                </div>
-
-
-                <div class="feature-pill">
-                    ⚡ Smart Caching
-                </div>
-
-
-                <div class="feature-pill">
-                    ◉ Source Citations
-                </div>
-
-
-            </div>
-
-
-
-            <!-- =================================================
-                 LOADING
-            ================================================== -->
-
-            <div
-                id="loadingCard"
-                class="loading-card hidden"
-            >
-
-                <div class="spinner"></div>
-
-
-                <div
-                    id="loadingText"
-                    class="loading-text"
-                >
-                    Searching your knowledge base...
-                </div>
-
-            </div>
-
-
-
-            <!-- =================================================
-                 ERROR
-            ================================================== -->
-
-            <div
-                id="errorCard"
-                class="error-card hidden"
-            >
-
-                <div id="errorMessage"></div>
-
-            </div>
-
-
-
-            <!-- =================================================
-                 ANSWER
-            ================================================== -->
-
-            <section
-                id="answerSection"
-                class="answer-section hidden"
-            >
-
-
-                <div class="result-card">
-
-
-                    <!-- RESULT HEADER -->
-
-                    <div class="result-header">
-
-
-                        <div class="result-title">
-
-                            <div class="result-icon">
+                            <span class="mode-option-icon">
                                 ✦
-                            </div>
-
-                            <span>
-                                Answer
                             </span>
 
-                        </div>
+                            Direct AI
 
+                            <span class="mode-option-subtitle">
+                                Claude
+                            </span>
 
-                        <div
-                            id="cacheStatus"
-                            class="cache-status"
-                        ></div>
-
-
-                    </div>
-
-
-
-                    <!-- ANSWER CONTENT -->
-
-                    <div class="answer-content">
-
-
-                        <div id="answerText"></div>
-
-
-                        <button
-                            id="copyButton"
-                            class="copy-button"
-                            type="button"
-                        >
-                            Copy answer
                         </button>
 
-
                     </div>
 
 
-                </div>
+                    <!-- QUESTION FORM -->
 
-
-            </section>
-
-
-
-            <!-- =================================================
-                 SOURCES
-            ================================================== -->
-
-            <section
-                id="sourcesSection"
-                class="sources-section hidden"
-            >
-
-
-                <div class="sources-header">
-
-
-                    <div class="sources-title">
-                        Knowledge Base Sources
-                    </div>
-
-
-                    <div
-                        id="sourcesCount"
-                        class="sources-count"
-                    ></div>
-
-
-                </div>
-
-
-                <div id="sourcesList"></div>
-
-
-            </section>
-
-
-
-            <!-- =================================================
-                 HISTORY SECTION
-            ================================================== -->
-
-            <section
-                id="historySection"
-                class="history-section hidden"
-            >
-
-
-                <div class="history-header">
-
-
-                    <div>
-
-                        <div class="history-title">
-                            Query History
-                        </div>
-
-
-                        <div class="history-subtitle">
-                            Your recent questions and answers
-                        </div>
-
-                    </div>
-
-
-                    <button
-                        id="closeHistoryButton"
-                        class="history-close-button"
-                        type="button"
+                    <form
+                        id="questionForm"
+                        class="question-form"
                     >
-                        Close
-                    </button>
 
+                        <div
+                            id="questionBox"
+                            class="question-box"
+                        >
+
+                            <textarea
+                                id="questionInput"
+                                rows="1"
+                                maxlength="2000"
+                                placeholder="Ask a question about your documents..."
+                                autocomplete="off"
+                            ></textarea>
+
+
+                            <button
+                                id="askButton"
+                                type="submit"
+                                class="ask-button"
+                            >
+
+                                <span id="askButtonText">
+                                    Ask
+                                </span>
+
+                                <span
+                                    id="askButtonIcon"
+                                    class="ask-button-icon"
+                                >
+                                    ↑
+                                </span>
+
+                            </button>
+
+                        </div>
+
+
+                        <!-- VALIDATION ERROR -->
+
+                        <div
+                            id="inputError"
+                            class="input-error hidden"
+                            role="alert"
+                            aria-live="polite"
+                        >
+
+                            <div class="input-error-icon">
+                                !
+                            </div>
+
+                            <div class="input-error-content">
+
+                                <strong id="inputErrorTitle">
+                                    Question required
+                                </strong>
+
+                                <span id="inputErrorMessage">
+                                    Please enter a question before asking Noxora.
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </form>
+
+
+                    <div class="input-footer">
+
+                        <span>
+                            Enter to ask
+                        </span>
+
+                        <span>
+                            •
+                        </span>
+
+                        <span>
+                            Shift + Enter for new line
+                        </span>
+
+                    </div>
 
                 </div>
-
-
-                <div id="historyList">
-
-                    <!-- History items will be inserted here -->
-
-                </div>
-
 
             </section>
 
+        </main>
 
-        </div>
+    </div>
 
-    </main>
-
-
-
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
-    <footer class="footer">
-
-        <div class="container">
-
-            Powered by
-
-            <strong>
-                AWS Bedrock
-            </strong>
-
-            ·
-
-            <strong>
-                Knowledge Bases
-            </strong>
-
-            ·
-
-            <strong>
-                Valkey
-            </strong>
-
-            ·
-
-            <strong>
-                DynamoDB
-            </strong>
-
-        </div>
-
-    </footer>
-
-
-
-    <!-- =====================================================
-         JAVASCRIPT
-    ====================================================== -->
 
     <script src="script.js"></script>
-
 
 </body>
 
