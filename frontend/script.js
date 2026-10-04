@@ -20,7 +20,7 @@ const INGESTION_POLL_INTERVAL =
     3000; // 3 seconds
 
 const INGESTION_TIMEOUT =
-    5 * 60 * 1000; // 5 minutes
+    10 * 60 * 1000; // 10 minutes
 
 
 /* ============================================================
@@ -158,11 +158,8 @@ async function apiRequest(
     };
 
     /*
-     * Only send Content-Type when there is
-     * actually a JSON request body.
-     *
-     * This avoids unnecessary CORS preflight
-     * requests for GET requests.
+     * Only send JSON Content-Type when
+     * a request body exists.
      */
 
     if (
@@ -460,8 +457,10 @@ async function askQuestion(
     }
 
     /*
-     * Don't query RAG while ingestion
-     * is still running.
+     * RAG is blocked while a new document
+     * is being synchronized.
+     *
+     * Direct AI remains available.
      */
 
     if (
@@ -508,17 +507,28 @@ async function askQuestion(
         );
 
         /*
-         * Backend response:
+         * Expected Lambda response:
          *
          * {
          *   success: true,
          *   question: "...",
          *   answer: "...",
          *   mode: "rag",
-         *   sources: [],
+         *   sources: [...],
          *   cached: false
          * }
          */
+
+        if (
+            !result ||
+            result.success === false
+        ) {
+
+            throw new Error(
+                result?.error ||
+                "Query failed."
+            );
+        }
 
         const answer =
             result.answer;
@@ -533,24 +543,22 @@ async function askQuestion(
                 result
             );
 
-            showAnswerError(
+            throw new Error(
                 "The API returned no answer."
             );
-
-            return;
         }
 
-        /*
-         * IMPORTANT:
-         *
-         * Render directly into:
-         *
-         * #answerContent
-         */
+        /* ----------------------------------------------------
+           ANSWER
+           ---------------------------------------------------- */
 
         renderAnswer(
             String(answer)
         );
+
+        /* ----------------------------------------------------
+           BADGES
+           ---------------------------------------------------- */
 
         updateAnswerBadges(
             result.mode ||
@@ -559,13 +567,17 @@ async function askQuestion(
             result.cached === true
         );
 
+        /* ----------------------------------------------------
+           SOURCES
+           ---------------------------------------------------- */
+
         renderSources(
             result.sources || []
         );
 
-        /*
-         * Refresh history.
-         */
+        /* ----------------------------------------------------
+           HISTORY
+           ---------------------------------------------------- */
 
         await loadHistory();
 
@@ -670,10 +682,6 @@ function renderAnswer(
         return;
     }
 
-    /*
-     * Safely render AI answer.
-     */
-
     answerContent.textContent =
         answer;
 
@@ -701,6 +709,10 @@ function updateAnswerBadges(
             mode === "rag"
                 ? "RAG"
                 : "Direct AI";
+
+        answerModeBadge.classList.remove(
+            "hidden"
+        );
     }
 
     if (cacheBadge) {
@@ -772,10 +784,34 @@ function renderSources(
             item.className =
                 "source-item";
 
+            /*
+             * IMPORTANT:
+             *
+             * Lambda returns:
+             *
+             * {
+             *   text: "...",
+             *   score: 0.91,
+             *   source: "s3://..."
+             * }
+             *
+             * NOT:
+             *
+             * {
+             *   name: "...",
+             *   uri: "..."
+             * }
+             */
+
+            const sourceUri =
+                source.source ||
+                source.uri ||
+                "";
+
             const name =
                 source.name ||
                 getFilenameFromUri(
-                    source.uri
+                    sourceUri
                 ) ||
                 `Source ${index + 1}`;
 
@@ -796,8 +832,17 @@ function renderSources(
             ) {
 
                 scoreText =
-                    ` · Relevance: ${score.toFixed(3)}`;
+                    `Relevance: ${score.toFixed(3)}`;
             }
+
+            /*
+             * Show the actual retrieved
+             * text snippet from Bedrock.
+             */
+
+            const preview =
+                source.text ||
+                "";
 
             item.innerHTML = `
                 <div class="source-name">
@@ -805,12 +850,33 @@ function renderSources(
                 </div>
 
                 <div class="source-preview">
-                    ${escapeHtml(
-                        source.uri || ""
-                    )}${escapeHtml(
-                        scoreText
-                    )}
+                    ${escapeHtml(sourceUri)}
                 </div>
+
+                ${
+                    scoreText
+                        ? `
+                            <div class="source-score">
+                                ${escapeHtml(scoreText)}
+                            </div>
+                          `
+                        : ""
+                }
+
+                ${
+                    preview
+                        ? `
+                            <div class="source-text">
+                                ${escapeHtml(
+                                    truncateText(
+                                        preview,
+                                        300
+                                    )
+                                )}
+                            </div>
+                          `
+                        : ""
+                }
             `;
 
             sourcesList.appendChild(
@@ -825,6 +891,10 @@ function renderSources(
 }
 
 
+/* ============================================================
+   SOURCE HELPERS
+   ============================================================ */
+
 function getFilenameFromUri(
     uri
 ) {
@@ -837,16 +907,55 @@ function getFilenameFromUri(
     try {
 
         const clean =
-            uri.split("?")[0];
+            String(uri)
+                .split("?")[0];
 
-        return decodeURIComponent(
-            clean.split("/").pop()
-        );
+        const filename =
+            clean
+                .split("/")
+                .pop();
+
+        if (
+            filename
+        ) {
+
+            return decodeURIComponent(
+                filename
+            );
+        }
 
     } catch {
 
-        return uri;
+        return String(uri);
     }
+
+    return String(uri);
+}
+
+
+function truncateText(
+    text,
+    maxLength
+) {
+
+    const value =
+        String(
+            text ?? ""
+        );
+
+    if (
+        value.length <= maxLength
+    ) {
+
+        return value;
+    }
+
+    return (
+        value.substring(
+            0,
+            maxLength
+        ) + "..."
+    );
 }
 
 
@@ -1042,15 +1151,6 @@ async function uploadPdf(
         /* ----------------------------------------------------
            STEP 1
            CREATE PRESIGNED URL
-
-           POST /upload
-
-           {
-               action: "create",
-               filename: "...",
-               contentType: "application/pdf",
-               fileSize: 123
-           }
            ---------------------------------------------------- */
 
         console.log(
@@ -1167,20 +1267,17 @@ async function uploadPdf(
 
         /* ----------------------------------------------------
            STEP 3
-           COMPLETE UPLOAD
-
-           IMPORTANT:
-           There is NO /upload/complete route.
-
-           Use:
-
+           START KNOWLEDGE BASE INGESTION
+           
            POST /upload
-
            {
                action: "complete",
                key: "...",
                filename: "..."
            }
+           
+           Backend starts ingestion and
+           returns immediately.
            ---------------------------------------------------- */
 
         setUploadStatus(
@@ -1233,13 +1330,51 @@ async function uploadPdf(
             60
         );
 
-        /* ----------------------------------------------------
-           STEP 4
-           POLL INGESTION
-           ---------------------------------------------------- */
+        setUploadStatus(
+            "loading",
+            "PDF uploaded successfully",
+            "Knowledge Base synchronization is running in the background."
+        );
 
-        await pollIngestionStatus(
+        /*
+         * IMPORTANT:
+         *
+         * DO NOT await this.
+         *
+         * Lambda has already returned.
+         * Bedrock continues ingestion independently.
+         *
+         * The browser polls the status in the
+         * background without blocking uploadPdf().
+         */
+
+        pollIngestionStatus(
             currentIngestionJobId
+        ).catch(
+            error => {
+
+                console.error(
+                    "Background ingestion error:",
+                    error
+                );
+
+                ingestionInProgress =
+                    false;
+
+                currentIngestionJobId =
+                    null;
+
+                setUploadStatus(
+                    "error",
+                    "Knowledge Base sync failed",
+                    error.message ||
+                        "Knowledge Base synchronization failed."
+                );
+
+                setUploadProgress(
+                    0
+                );
+            }
         );
 
     } catch (error) {
@@ -1267,6 +1402,13 @@ async function uploadPdf(
         );
 
     } finally {
+
+        /*
+         * Upload operation itself is finished.
+         *
+         * This does NOT mean Knowledge Base
+         * ingestion is finished.
+         */
 
         isUploading =
             false;
@@ -1312,31 +1454,12 @@ async function pollIngestionStatus(
         ) {
 
             throw new Error(
-                "Knowledge Base synchronization is taking longer than 5 minutes. Check the ingestion status in AWS."
+                "Knowledge Base synchronization is taking longer than 10 minutes. Check the ingestion status in AWS."
             );
         }
 
-        setUploadStatus(
-            "loading",
-            "Syncing Knowledge Base",
-            "Processing and indexing your PDF..."
-        );
-
         /* ----------------------------------------------------
-           IMPORTANT:
-
-           There is NO:
-
-           POST /upload/status
-
-           Instead:
-
-           POST /upload
-
-           {
-               action: "status",
-               ingestionJobId: "..."
-           }
+           STATUS REQUEST
            ---------------------------------------------------- */
 
         const statusResult =
@@ -1375,6 +1498,12 @@ async function pollIngestionStatus(
             status === "STARTING"
         ) {
 
+            setUploadStatus(
+                "loading",
+                "Starting Knowledge Base sync",
+                "Bedrock is preparing the document..."
+            );
+
             setUploadProgress(
                 65
             );
@@ -1382,6 +1511,12 @@ async function pollIngestionStatus(
         } else if (
             status === "IN_PROGRESS"
         ) {
+
+            setUploadStatus(
+                "loading",
+                "Syncing Knowledge Base",
+                "Processing and indexing your PDF..."
+            );
 
             setUploadProgress(
                 80
@@ -1400,20 +1535,26 @@ async function pollIngestionStatus(
                 {};
 
             const indexed =
-                stats.numberOfNewDocumentsIndexed ||
-                0;
+                Number(
+                    stats.numberOfNewDocumentsIndexed ||
+                    0
+                );
 
             const modified =
-                stats.numberOfModifiedDocumentsIndexed ||
-                0;
+                Number(
+                    stats.numberOfModifiedDocumentsIndexed ||
+                    0
+                );
 
             const failed =
-                stats.numberOfDocumentsFailed ||
-                0;
+                Number(
+                    stats.numberOfDocumentsFailed ||
+                    0
+                );
 
             const totalIndexed =
-                Number(indexed) +
-                Number(modified);
+                indexed +
+                modified;
 
             /* ------------------------------------------------
                FAILED DOCUMENTS
@@ -1421,7 +1562,7 @@ async function pollIngestionStatus(
 
             if (
                 totalIndexed === 0 &&
-                Number(failed) > 0
+                failed > 0
             ) {
 
                 const failure =
@@ -1437,27 +1578,35 @@ async function pollIngestionStatus(
             }
 
             /* ------------------------------------------------
-               NOTHING INDEXED
+               NO DOCUMENT INDEXED
                ------------------------------------------------ */
 
             if (
                 totalIndexed === 0
             ) {
 
-                throw new Error(
-                    "Knowledge Base sync completed, but no new document was indexed. Check the Bedrock S3 data source configuration."
+                /*
+                 * Do not automatically treat COMPLETE
+                 * as an error in every case.
+                 *
+                 * Existing documents / no-change cases
+                 * can legitimately have zero new documents.
+                 */
+
+                setUploadStatus(
+                    "success",
+                    "Knowledge Base sync complete",
+                    "The document ingestion job completed successfully. New content may take a short time to become available for RAG queries."
+                );
+
+            } else {
+
+                setUploadStatus(
+                    "success",
+                    "PDF ready",
+                    `${totalIndexed} document(s) indexed successfully. You can now ask questions.`
                 );
             }
-
-            /* ------------------------------------------------
-               SUCCESS
-               ------------------------------------------------ */
-
-            setUploadStatus(
-                "success",
-                "PDF ready",
-                `${totalIndexed} document(s) indexed successfully. You can now ask questions.`
-            );
 
             ingestionInProgress =
                 false;
@@ -1651,13 +1800,9 @@ async function loadHistory() {
     try {
 
         /*
-         * IMPORTANT:
-         *
-         * Correct API Gateway route:
+         * Correct route:
          *
          * GET /query/history
-         *
-         * NOT /history
          */
 
         const result =
@@ -1673,11 +1818,28 @@ async function loadHistory() {
             result
         );
 
+        /*
+         * IMPORTANT:
+         *
+         * Lambda returns:
+         *
+         * {
+         *   success: true,
+         *   history: [...]
+         * }
+         *
+         * NOT:
+         *
+         * {
+         *   items: [...]
+         * }
+         */
+
         const items =
             Array.isArray(
-                result.items
+                result.history
             )
-                ? result.items
+                ? result.history
                 : [];
 
         renderHistory(
@@ -1760,8 +1922,10 @@ function renderHistory(
                 "";
 
             const mode =
-                item.mode ||
-                "rag";
+                String(
+                    item.mode ||
+                    "rag"
+                ).toLowerCase();
 
             const timestamp =
                 formatDate(
@@ -1799,6 +1963,11 @@ function renderHistory(
 
                 </div>
             `;
+
+            /*
+             * Clicking history restores
+             * the question into the input.
+             */
 
             historyItem.addEventListener(
                 "click",
