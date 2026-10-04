@@ -17,6 +17,484 @@
         href="style.css"
     >
 
+    <!-- =====================================================
+         HISTORY DRAWER STYLES
+    ====================================================== -->
+
+    <style>
+
+        /* =====================================================
+           HISTORY BUTTON
+        ====================================================== */
+
+        .history-button {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            border: 1px solid rgba(255,255,255,0.10);
+
+            background: rgba(255,255,255,0.045);
+
+            color: inherit;
+
+            border-radius: 10px;
+
+            padding: 9px 12px;
+
+            font: inherit;
+
+            cursor: pointer;
+
+            transition:
+                background 0.2s ease,
+                transform 0.2s ease;
+
+        }
+
+
+        .history-button:hover {
+
+            background:
+                rgba(255,255,255,0.09);
+
+            transform:
+                translateY(-1px);
+
+        }
+
+
+        .history-button-icon {
+
+            font-size: 17px;
+
+            line-height: 1;
+
+        }
+
+
+        .history-button-count {
+
+            min-width: 20px;
+
+            height: 20px;
+
+            padding:
+                0 6px;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.10);
+
+            font-size: 11px;
+
+        }
+
+
+        /* =====================================================
+           HISTORY OVERLAY
+        ====================================================== */
+
+        .history-overlay {
+
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 998;
+
+            background:
+                rgba(0,0,0,0.42);
+
+            backdrop-filter:
+                blur(2px);
+
+            opacity: 0;
+
+            visibility: hidden;
+
+            transition:
+                opacity 0.22s ease,
+                visibility 0.22s ease;
+
+        }
+
+
+        .history-overlay.open {
+
+            opacity: 1;
+
+            visibility: visible;
+
+        }
+
+
+        /* =====================================================
+           HISTORY PANEL
+        ====================================================== */
+
+        .history-panel {
+
+            position: fixed;
+
+            top: 0;
+
+            right: 0;
+
+            bottom: 0;
+
+            width:
+                min(390px, 92vw);
+
+            z-index: 999;
+
+            display: flex;
+
+            flex-direction: column;
+
+            background:
+                #111318;
+
+            border-left:
+                1px solid rgba(255,255,255,0.10);
+
+            box-shadow:
+                -18px 0 50px rgba(0,0,0,0.30);
+
+            transform:
+                translateX(100%);
+
+            visibility: hidden;
+
+            transition:
+                transform 0.24s ease,
+                visibility 0.24s ease;
+
+        }
+
+
+        .history-panel.open {
+
+            transform:
+                translateX(0);
+
+            visibility: visible;
+
+        }
+
+
+        /* =====================================================
+           HISTORY HEADER
+        ====================================================== */
+
+        .history-panel-header {
+
+            min-height:
+                78px;
+
+            padding:
+                18px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 14px;
+
+        }
+
+
+        .history-panel-title {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            min-width: 0;
+
+        }
+
+
+        .history-panel-title h2 {
+
+            margin:
+                3px 0 0;
+
+            font-size:
+                18px;
+
+            line-height:
+                1.2;
+
+        }
+
+
+        .history-panel-icon {
+
+            width:
+                38px;
+
+            height:
+                38px;
+
+            flex:
+                0 0 38px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            border-radius:
+                10px;
+
+            background:
+                rgba(255,255,255,0.07);
+
+            font-size:
+                20px;
+
+        }
+
+
+        .history-close-button {
+
+            width:
+                36px;
+
+            height:
+                36px;
+
+            flex:
+                0 0 36px;
+
+            border:
+                0;
+
+            border-radius:
+                9px;
+
+            background:
+                rgba(255,255,255,0.06);
+
+            color:
+                inherit;
+
+            font-size:
+                25px;
+
+            line-height:
+                1;
+
+            cursor:
+                pointer;
+
+            transition:
+                background 0.2s ease;
+
+        }
+
+
+        .history-close-button:hover {
+
+            background:
+                rgba(255,255,255,0.12);
+
+        }
+
+
+        .history-panel-divider {
+
+            height:
+                1px;
+
+            margin:
+                0 18px;
+
+            background:
+                rgba(255,255,255,0.08);
+
+        }
+
+
+        /* =====================================================
+           HISTORY LIST
+        ====================================================== */
+
+        .history-panel .history-list {
+
+            flex:
+                1;
+
+            overflow-y:
+                auto;
+
+            padding:
+                14px;
+
+        }
+
+
+        .history-panel .history-item {
+
+            width:
+                100%;
+
+            display:
+                block;
+
+            text-align:
+                left;
+
+            margin:
+                0 0 8px;
+
+            padding:
+                13px 14px;
+
+            border:
+                1px solid rgba(255,255,255,0.07);
+
+            border-radius:
+                10px;
+
+            background:
+                rgba(255,255,255,0.035);
+
+            color:
+                inherit;
+
+            cursor:
+                pointer;
+
+            transition:
+                background 0.18s ease,
+                border-color 0.18s ease,
+                transform 0.18s ease;
+
+        }
+
+
+        .history-panel .history-item:hover {
+
+            background:
+                rgba(255,255,255,0.075);
+
+            border-color:
+                rgba(255,255,255,0.14);
+
+            transform:
+                translateX(-2px);
+
+        }
+
+
+        .history-panel .history-question {
+
+            display:
+                block;
+
+            overflow:
+                hidden;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .history-panel .history-empty {
+
+            min-height:
+                180px;
+
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            gap:
+                10px;
+
+            opacity:
+                0.65;
+
+            text-align:
+                center;
+
+        }
+
+
+        /* =====================================================
+           BODY LOCK WHEN HISTORY IS OPEN
+        ====================================================== */
+
+        body.history-drawer-open {
+
+            overflow:
+                hidden;
+
+        }
+
+
+        /* =====================================================
+           MOBILE
+        ====================================================== */
+
+        @media (max-width: 700px) {
+
+            .history-button {
+
+                padding:
+                    9px 10px;
+
+            }
+
+
+            .history-button-count {
+
+                display:
+                    none;
+
+            }
+
+
+            .history-panel {
+
+                width:
+                    min(360px, 94vw);
+
+            }
+
+        }
+
+    </style>
+
 </head>
 
 
@@ -27,16 +505,100 @@
 
 
     <!-- =================================================
+         HISTORY DRAWER
+    ================================================== -->
+
+    <div
+        id="historyOverlay"
+        class="history-overlay"
+        aria-hidden="true"
+    ></div>
+
+
+    <aside
+        id="historyPanel"
+        class="history-panel"
+        aria-hidden="true"
+        aria-label="Query history"
+    >
+
+        <div class="history-panel-header">
+
+            <div class="history-panel-title">
+
+                <span class="history-panel-icon">
+                    ◷
+                </span>
+
+                <div>
+
+                    <span class="result-label">
+                        RECENT QUERIES
+                    </span>
+
+                    <h2>
+                        Query History
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <button
+                id="historyCloseButton"
+                type="button"
+                class="history-close-button"
+                aria-label="Close query history"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="history-panel-divider"></div>
+
+
+        <div
+            id="historyList"
+            class="history-list"
+        >
+
+            <div class="history-empty">
+
+                <div class="history-empty-icon">
+                    ◌
+                </div>
+
+                <span>
+                    No queries yet
+                </span>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =================================================
          SIDEBAR
     ================================================== -->
 
     <aside class="sidebar">
+
+
+        <!-- =================================================
+             BRAND
+        ================================================== -->
 
         <div class="brand">
 
             <div class="brand-icon">
                 N
             </div>
+
 
             <div class="brand-text">
 
@@ -56,45 +618,9 @@
         <div class="sidebar-divider"></div>
 
 
-        <div class="sidebar-section">
-
-            <div class="section-heading">
-
-                <span>
-                    Query History
-                </span>
-
-                <span
-                    id="historyCount"
-                    class="history-count"
-                >
-                    0
-                </span>
-
-            </div>
-
-
-            <div
-                id="historyList"
-                class="history-list"
-            >
-
-                <div class="history-empty">
-
-                    <div class="history-empty-icon">
-                        ◌
-                    </div>
-
-                    <span>
-                        No queries yet
-                    </span>
-
-                </div>
-
-            </div>
-
-        </div>
-
+        <!-- =================================================
+             SIDEBAR FOOTER
+        ================================================== -->
 
         <div class="sidebar-footer">
 
@@ -108,11 +634,13 @@
 
             </div>
 
+
             <span class="version">
                 AI Knowledge Assistant
             </span>
 
         </div>
+
 
     </aside>
 
@@ -124,20 +652,56 @@
     <main class="main-content">
 
 
-        <!-- TOPBAR -->
+        <!-- =================================================
+             TOPBAR
+        ================================================== -->
 
         <header class="topbar">
+
 
             <div class="topbar-left">
 
                 <div class="breadcrumb">
+
                     Knowledge Assistant
+
                 </div>
 
             </div>
 
 
             <div class="topbar-right">
+
+
+                <!-- HISTORY BUTTON -->
+
+                <button
+                    id="historyButton"
+                    type="button"
+                    class="history-button"
+                    aria-label="Open query history"
+                    aria-expanded="false"
+                >
+
+                    <span class="history-button-icon">
+                        ◷
+                    </span>
+
+                    <span>
+                        History
+                    </span>
+
+                    <span
+                        id="historyButtonCount"
+                        class="history-button-count"
+                    >
+                        0
+                    </span>
+
+                </button>
+
+
+                <!-- ONLINE -->
 
                 <div class="online-badge">
 
@@ -147,12 +711,15 @@
 
                 </div>
 
+
             </div>
 
         </header>
 
 
-        <!-- CONTENT -->
+        <!-- =================================================
+             CONTENT
+        ================================================== -->
 
         <section class="content-area">
 
@@ -168,17 +735,21 @@
 
                 <div class="hero-glow"></div>
 
+
                 <div class="welcome-icon">
                     ✦
                 </div>
+
 
                 <div class="eyebrow">
                     INTELLIGENT KNOWLEDGE SEARCH
                 </div>
 
+
                 <h2>
                     Ask <span>Noxora</span>
                 </h2>
+
 
                 <p>
                     Search your knowledge base with AI-powered
@@ -206,16 +777,21 @@
                     aria-label="AI response mode"
                 >
 
+
+                    <!-- RAG -->
+
                     <button
                         type="button"
                         class="mode-option active"
                         data-mode="rag"
+                        aria-selected="true"
                         aria-pressed="true"
                     >
 
                         <span class="mode-option-icon">
                             ◈
                         </span>
+
 
                         <span class="mode-option-text">
 
@@ -232,16 +808,20 @@
                     </button>
 
 
+                    <!-- DIRECT AI -->
+
                     <button
                         type="button"
                         class="mode-option"
                         data-mode="direct"
+                        aria-selected="false"
                         aria-pressed="false"
                     >
 
                         <span class="mode-option-icon">
                             ✦
                         </span>
+
 
                         <span class="mode-option-text">
 
@@ -269,10 +849,12 @@
                     class="question-form"
                 >
 
+
                     <div
                         id="questionBox"
                         class="question-box"
                     >
+
 
                         <div class="input-icon">
                             ⌕
@@ -298,6 +880,7 @@
                                 Ask Noxora
                             </span>
 
+
                             <span
                                 id="askButtonIcon"
                                 class="ask-button-icon"
@@ -310,7 +893,9 @@
                     </div>
 
 
-                    <!-- INPUT ERROR -->
+                    <!-- =================================================
+                         INPUT ERROR
+                    ================================================== -->
 
                     <div
                         id="inputError"
@@ -323,11 +908,13 @@
                             !
                         </div>
 
+
                         <div class="input-error-content">
 
                             <strong id="inputErrorTitle">
                                 Question required
                             </strong>
+
 
                             <span id="inputErrorMessage">
                                 Please enter a question before asking Noxora.
@@ -340,23 +927,31 @@
                 </form>
 
 
+                <!-- =================================================
+                     INPUT FOOTER
+                ================================================== -->
+
                 <div class="input-footer">
 
                     <span>
                         Enter to ask
                     </span>
 
+
                     <span class="footer-separator">
                         •
                     </span>
+
 
                     <span>
                         Shift + Enter for new line
                     </span>
 
+
                     <span class="footer-separator">
                         •
                     </span>
+
 
                     <span>
                         Max 2,000 characters
@@ -374,6 +969,7 @@
                     class="upload-panel"
                 >
 
+
                     <input
                         id="pdfInput"
                         type="file"
@@ -382,6 +978,7 @@
 
 
                     <div class="upload-dropzone">
+
 
                         <div class="upload-icon-wrapper">
 
@@ -398,6 +995,7 @@
                                 Add knowledge to Noxora
                             </h3>
 
+
                             <p>
                                 Upload a PDF and make it available
                                 to your Knowledge Base.
@@ -410,9 +1008,11 @@
                                     PDF only
                                 </span>
 
+
                                 <span class="meta-dot">
                                     •
                                 </span>
+
 
                                 <span>
                                     Maximum 10 MB
@@ -436,6 +1036,7 @@
                                 ↑
                             </span>
 
+
                             <span
                                 id="uploadButtonText"
                             >
@@ -447,7 +1048,9 @@
                     </div>
 
 
-                    <!-- UPLOAD STATUS -->
+                    <!-- =================================================
+                         UPLOAD STATUS
+                    ================================================== -->
 
                     <div
                         id="uploadStatus"
@@ -472,6 +1075,7 @@
                                 Uploading PDF
                             </strong>
 
+
                             <span
                                 id="uploadStatusMessage"
                             >
@@ -493,11 +1097,16 @@
                     </div>
 
 
+                    <!-- =================================================
+                         UPLOAD NOTE
+                    ================================================== -->
+
                     <div class="upload-note">
 
                         <span class="upload-note-icon">
                             ⓘ
                         </span>
+
 
                         <span>
                             After upload, the document must be ingested
@@ -521,13 +1130,20 @@
                 class="answer-section hidden"
             >
 
+
+                <!-- =================================================
+                     RESULT HEADING
+                ================================================== -->
+
                 <div class="result-heading">
+
 
                     <div>
 
                         <span class="result-label">
                             RESPONSE
                         </span>
+
 
                         <h3>
                             Noxora's Answer
@@ -537,6 +1153,7 @@
 
 
                     <div class="answer-badges">
+
 
                         <div
                             id="answerModeBadge"
@@ -558,6 +1175,10 @@
                 </div>
 
 
+                <!-- =================================================
+                     ANSWER CARD
+                ================================================== -->
+
                 <div class="answer-card">
 
                     <div
@@ -568,12 +1189,15 @@
                 </div>
 
 
-                <!-- SOURCES -->
+                <!-- =================================================
+                     SOURCES
+                ================================================== -->
 
                 <div
                     id="sourcesSection"
                     class="sources-section hidden"
                 >
+
 
                     <div class="sources-heading">
 
@@ -582,6 +1206,7 @@
                             <span class="result-label">
                                 GROUNDED SOURCES
                             </span>
+
 
                             <h3>
                                 References
@@ -599,17 +1224,25 @@
 
                 </div>
 
+
             </div>
 
 
         </section>
 
+
     </main>
+
 
 </div>
 
 
+<!-- =========================================================
+     JAVASCRIPT
+========================================================== -->
+
 <script src="script.js"></script>
+
 
 </body>
 
