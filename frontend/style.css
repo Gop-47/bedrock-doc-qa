@@ -135,9 +135,6 @@ body {
     overflow: hidden;
 }
 
-
-/* Sidebar glow */
-
 .sidebar::before {
     content: "";
 
@@ -179,7 +176,6 @@ body {
         22px;
 }
 
-
 .brand-icon {
     width: 43px;
     height: 43px;
@@ -209,7 +205,6 @@ body {
         rgba(79, 70, 229, 0.34);
 }
 
-
 .brand-text h1 {
     margin: 0;
 
@@ -220,7 +215,6 @@ body {
 
     letter-spacing: -0.5px;
 }
-
 
 .brand-text span {
     display: block;
@@ -263,7 +257,6 @@ body {
     min-height: 0;
 }
 
-
 .section-heading {
     display: flex;
 
@@ -284,7 +277,6 @@ body {
 
     text-transform: uppercase;
 }
-
 
 .history-count {
     min-width: 22px;
@@ -313,7 +305,7 @@ body {
 
 
 /* =========================================================
-   HISTORY LIST
+   HISTORY
 ========================================================= */
 
 .history-list {
@@ -330,21 +322,14 @@ body {
     overflow-y: auto;
 }
 
-
 .history-list::-webkit-scrollbar {
     width: 4px;
 }
-
 
 .history-list::-webkit-scrollbar-thumb {
     background:
         rgba(148, 163, 184, 0.15);
 }
-
-
-/* =========================================================
-   EMPTY HISTORY
-========================================================= */
 
 .history-empty {
     display: flex;
@@ -365,7 +350,6 @@ body {
     font-size: 12px;
 }
 
-
 .history-empty-icon {
     width: 35px;
     height: 35px;
@@ -383,11 +367,6 @@ body {
 
     font-size: 18px;
 }
-
-
-/* =========================================================
-   HISTORY ITEM
-========================================================= */
 
 .history-item {
     width: 100%;
@@ -415,7 +394,6 @@ body {
         box-shadow 0.18s ease;
 }
 
-
 .history-item:hover {
     background:
         rgba(148, 163, 184, 0.06);
@@ -426,9 +404,6 @@ body {
     transform:
         translateX(2px);
 }
-
-
-/* Selected history item */
 
 .history-item.selected {
     background:
@@ -445,15 +420,9 @@ body {
         inset 3px 0 0 #6366f1;
 }
 
-
 .history-item.selected .history-question {
     color: #e2e8f0;
 }
-
-
-/* =========================================================
-   HISTORY MODE
-========================================================= */
 
 .history-mode {
     display: inline-flex;
@@ -477,18 +446,12 @@ body {
     letter-spacing: 0.6px;
 }
 
-
 .history-item.selected .history-mode {
     background:
         rgba(129, 140, 248, 0.13);
 
     color: #a5b4fc;
 }
-
-
-/* =========================================================
-   HISTORY QUESTION
-========================================================= */
 
 .history-question {
     color: #bdc6d5;
@@ -525,7 +488,6 @@ body {
         0;
 }
 
-
 .system-status {
     display: flex;
 
@@ -537,7 +499,6 @@ body {
 
     font-size: 10px;
 }
-
 
 .status-dot {
     width: 7px;
@@ -554,7 +515,6 @@ body {
         rgba(52, 211, 153, 0.55);
 }
 
-
 .version {
     display: block;
 
@@ -567,7 +527,7 @@ body {
 
 
 /* =========================================================
-   MAIN CONTENT
+   MAIN
 ========================================================= */
 
 .main-content {
@@ -618,14 +578,12 @@ body {
         blur(18px);
 }
 
-
 .breadcrumb {
     color: #6f7b91;
 
     font-size: 11px;
     font-weight: 550;
 }
-
 
 .online-badge {
     display: flex;
@@ -654,7 +612,7 @@ body {
 
 
 /* =========================================================
-   CONTENT AREA
+   CONTENT
 ========================================================= */
 
 .content-area {
@@ -676,7 +634,7 @@ body {
 
 
 /* =========================================================
-   WELCOME / HERO
+   HERO
 ========================================================= */
 
 .welcome-section {
@@ -689,7 +647,6 @@ body {
         0
         34px;
 }
-
 
 .hero-glow {
     position: absolute;
@@ -712,7 +669,6 @@ body {
 
     pointer-events: none;
 }
-
 
 .welcome-icon {
     position: relative;
@@ -751,7 +707,6 @@ body {
         rgba(79, 70, 229, 0.12);
 }
 
-
 .eyebrow {
     color: #737fa0;
 
@@ -762,7 +717,6 @@ body {
 
     margin-bottom: 8px;
 }
-
 
 .welcome-section h2 {
     position: relative;
@@ -777,7 +731,6 @@ body {
     letter-spacing: -1.3px;
 }
 
-
 .welcome-section h2 span {
     background:
         linear-gradient(
@@ -791,7 +744,6 @@ body {
 
     color: transparent;
 }
-
 
 .welcome-section p {
     max-width: 550px;
@@ -810,7 +762,7 @@ body {
 
 
 /* =========================================================
-   SEARCH AREA
+   SEARCH
 ========================================================= */
 
 .search-area {
@@ -849,7 +801,6 @@ body {
         rgba(0, 0, 0, 0.14);
 }
 
-
 .mode-option {
     border:
         1px solid
@@ -877,14 +828,12 @@ body {
         all 0.18s ease;
 }
 
-
 .mode-option:hover:not(:disabled) {
     color: #c3ccdc;
 
     background:
         rgba(148, 163, 184, 0.05);
 }
-
 
 .mode-option.active {
     background:
@@ -904,20 +853,17 @@ body {
         rgba(0, 0, 0, 0.12);
 }
 
-
 .mode-option:disabled {
     cursor: not-allowed;
 
     opacity: 0.5;
 }
 
-
 .mode-option-icon {
     font-size: 13px;
 
     color: #8b95ff;
 }
-
 
 .mode-option-text {
     display: flex;
@@ -929,13 +875,11 @@ body {
     gap: 1px;
 }
 
-
 .mode-option-text strong {
     font-size: 10px;
 
     font-weight: 750;
 }
-
 
 .mode-option-text small {
     color: #68758c;
@@ -947,17 +891,12 @@ body {
 
 
 /* =========================================================
-   QUESTION FORM
+   QUESTION
 ========================================================= */
 
 .question-form {
     width: 100%;
 }
-
-
-/* =========================================================
-   QUESTION BOX
-========================================================= */
 
 .question-box {
     display: flex;
@@ -999,7 +938,6 @@ body {
         box-shadow 0.18s ease;
 }
 
-
 .question-box:focus-within {
     border-color:
         rgba(129, 140, 248, 0.40);
@@ -1012,11 +950,6 @@ body {
         rgba(99, 102, 241, 0.06);
 }
 
-
-/* =========================================================
-   ERROR STATE
-========================================================= */
-
 .question-box.has-error {
     border-color:
         rgba(248, 113, 113, 0.65);
@@ -1028,11 +961,6 @@ body {
         0 18px 50px
         rgba(0, 0, 0, 0.22);
 }
-
-
-/* =========================================================
-   INPUT ICON
-========================================================= */
 
 .input-icon {
     width: 27px;
@@ -1049,11 +977,6 @@ body {
 
     font-size: 21px;
 }
-
-
-/* =========================================================
-   TEXTAREA
-========================================================= */
 
 #questionInput {
     flex: 1;
@@ -1083,11 +1006,9 @@ body {
     color: #e6ebf4;
 }
 
-
 #questionInput::placeholder {
     color: #59667d;
 }
-
 
 #questionInput:disabled {
     opacity: 0.55;
@@ -1145,7 +1066,6 @@ body {
         opacity 0.15s ease;
 }
 
-
 .ask-button:hover:not(:disabled) {
     transform:
         translateY(-1px);
@@ -1155,12 +1075,10 @@ body {
         rgba(79, 70, 229, 0.34);
 }
 
-
 .ask-button:active:not(:disabled) {
     transform:
         translateY(0);
 }
-
 
 .ask-button:disabled {
     opacity: 0.55;
@@ -1169,7 +1087,6 @@ body {
 
     box-shadow: none;
 }
-
 
 .ask-button-icon {
     font-size: 17px;
@@ -1196,7 +1113,6 @@ body {
 
     font-size: 9px;
 }
-
 
 .footer-separator {
     color: #303b50;
@@ -1243,8 +1159,8 @@ body {
         errorIn 0.2s ease;
 }
 
-
 @keyframes errorIn {
+
     from {
         opacity: 0;
 
@@ -1258,8 +1174,8 @@ body {
         transform:
             translateY(0);
     }
-}
 
+}
 
 .input-error-icon {
     width: 21px;
@@ -1284,7 +1200,6 @@ body {
     font-weight: 800;
 }
 
-
 .input-error-content {
     display: flex;
 
@@ -1293,13 +1208,11 @@ body {
     gap: 2px;
 }
 
-
 .input-error-content strong {
     color: #fecaca;
 
     font-size: 11px;
 }
-
 
 .input-error-content span {
     color: #c98989;
@@ -1311,7 +1224,332 @@ body {
 
 
 /* =========================================================
-   ANSWER SECTION
+   PDF UPLOAD PANEL
+========================================================= */
+
+.upload-panel {
+    margin-top: 18px;
+
+    padding:
+        14px
+        15px;
+
+    border:
+        1px solid
+        rgba(148, 163, 184, 0.11);
+
+    border-radius: 13px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(17, 26, 44, 0.82),
+            rgba(13, 21, 37, 0.90)
+        );
+
+    box-shadow:
+        0 10px 30px
+        rgba(0, 0, 0, 0.12);
+}
+
+.upload-header {
+    display: flex;
+
+    align-items: center;
+
+    gap: 11px;
+}
+
+.upload-header-icon {
+    width: 34px;
+    height: 34px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border:
+        1px solid
+        rgba(129, 140, 248, 0.16);
+
+    border-radius: 9px;
+
+    background:
+        rgba(99, 102, 241, 0.09);
+
+    color: #a5b4fc;
+
+    font-size: 19px;
+}
+
+.upload-header-text {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 2px;
+
+    flex: 1;
+
+    min-width: 0;
+}
+
+.upload-header-text strong {
+    color: #cbd5e1;
+
+    font-size: 11px;
+
+    font-weight: 700;
+}
+
+.upload-header-text span {
+    color: #68758c;
+
+    font-size: 9px;
+}
+
+.upload-button {
+    flex-shrink: 0;
+
+    height: 34px;
+
+    padding:
+        0
+        13px;
+
+    border:
+        1px solid
+        rgba(129, 140, 248, 0.20);
+
+    border-radius: 8px;
+
+    background:
+        rgba(99, 102, 241, 0.10);
+
+    color: #aeb7ff;
+
+    font-family: inherit;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.18s ease;
+}
+
+.upload-button:hover {
+    background:
+        rgba(99, 102, 241, 0.17);
+
+    border-color:
+        rgba(129, 140, 248, 0.30);
+
+    transform:
+        translateY(-1px);
+}
+
+.upload-button:disabled {
+    opacity: 0.45;
+
+    cursor: not-allowed;
+
+    transform: none;
+}
+
+.upload-help {
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    margin-top: 9px;
+
+    padding-left: 45px;
+
+    color: #4f5d73;
+
+    font-size: 8px;
+}
+
+.upload-help span:first-child {
+    color: #68758c;
+}
+
+
+/* =========================================================
+   UPLOAD STATUS
+========================================================= */
+
+.upload-status {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 10px;
+
+    margin-top: 12px;
+
+    padding:
+        11px
+        12px;
+
+    border:
+        1px solid
+        rgba(129, 140, 248, 0.12);
+
+    border-radius: 9px;
+
+    background:
+        rgba(99, 102, 241, 0.05);
+
+    animation:
+        uploadStatusIn 0.22s ease;
+}
+
+@keyframes uploadStatusIn {
+
+    from {
+        opacity: 0;
+
+        transform:
+            translateY(-3px);
+    }
+
+    to {
+        opacity: 1;
+
+        transform:
+            translateY(0);
+    }
+
+}
+
+.upload-status-icon {
+    width: 25px;
+    height: 25px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 7px;
+
+    background:
+        rgba(99, 102, 241, 0.11);
+
+    color: #9da5ff;
+
+    font-size: 12px;
+
+    font-weight: 800;
+}
+
+.upload-status-content {
+    flex: 1;
+
+    min-width: 0;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+}
+
+.upload-status-content strong {
+    color: #cbd5e1;
+
+    font-size: 10px;
+
+    font-weight: 700;
+}
+
+.upload-status-content span {
+    color: #68758c;
+
+    font-size: 9px;
+
+    line-height: 1.45;
+}
+
+.upload-progress {
+    width: 100%;
+
+    height: 3px;
+
+    margin-top: 6px;
+
+    overflow: hidden;
+
+    border-radius: 10px;
+
+    background:
+        rgba(148, 163, 184, 0.08);
+}
+
+.upload-progress-bar {
+    width: 0%;
+
+    height: 100%;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            90deg,
+            #6366f1,
+            #60a5fa
+        );
+
+    transition:
+        width 0.25s ease;
+}
+
+.upload-status.success {
+    border-color:
+        rgba(52, 211, 153, 0.15);
+
+    background:
+        rgba(52, 211, 153, 0.045);
+}
+
+.upload-status.success .upload-status-icon {
+    background:
+        rgba(52, 211, 153, 0.10);
+
+    color: #6ee7b7;
+}
+
+.upload-status.error {
+    border-color:
+        rgba(248, 113, 113, 0.18);
+
+    background:
+        rgba(127, 29, 29, 0.08);
+}
+
+.upload-status.error .upload-status-icon {
+    background:
+        rgba(248, 113, 113, 0.10);
+
+    color: #f87171;
+}
+
+
+/* =========================================================
+   ANSWER
 ========================================================= */
 
 .answer-section {
@@ -1321,8 +1559,8 @@ body {
         resultIn 0.35s ease;
 }
 
-
 @keyframes resultIn {
+
     from {
         opacity: 0;
 
@@ -1336,12 +1574,8 @@ body {
         transform:
             translateY(0);
     }
+
 }
-
-
-/* =========================================================
-   RESULT HEADING
-========================================================= */
 
 .result-heading {
     display: flex;
@@ -1354,7 +1588,6 @@ body {
 
     margin-bottom: 12px;
 }
-
 
 .result-label {
     display: block;
@@ -1369,7 +1602,6 @@ body {
 
     letter-spacing: 1.2px;
 }
-
 
 .result-heading h3,
 .sources-heading h3 {
@@ -1386,7 +1618,7 @@ body {
 
 
 /* =========================================================
-   ANSWER BADGES
+   BADGES
 ========================================================= */
 
 .answer-badges {
@@ -1396,7 +1628,6 @@ body {
 
     gap: 6px;
 }
-
 
 .mode-badge,
 .cache-badge {
@@ -1427,7 +1658,6 @@ body {
 
     letter-spacing: 0.6px;
 }
-
 
 .cache-badge {
     border-color:
@@ -1467,9 +1697,6 @@ body {
     overflow: hidden;
 }
 
-
-/* Small premium top line */
-
 .answer-card::before {
     content: "";
 
@@ -1490,11 +1717,6 @@ body {
         );
 }
 
-
-/* =========================================================
-   ANSWER CONTENT
-========================================================= */
-
 .answer-content {
     padding:
         23px
@@ -1507,7 +1729,6 @@ body {
     line-height: 1.75;
 }
 
-
 .answer-content p {
     margin:
         0
@@ -1515,18 +1736,15 @@ body {
         13px;
 }
 
-
 .answer-content p:last-child {
     margin-bottom: 0;
 }
-
 
 .answer-content strong {
     color: #f0f4fa;
 
     font-weight: 700;
 }
-
 
 .answer-content ul,
 .answer-content ol {
@@ -1539,15 +1757,9 @@ body {
     padding-left: 18px;
 }
 
-
 .answer-content li {
     margin-bottom: 6px;
 }
-
-
-/* =========================================================
-   EMPTY ANSWER
-========================================================= */
 
 .empty-answer {
     color: #76839a;
@@ -1570,7 +1782,6 @@ body {
     color: #7d8aa0;
 }
 
-
 .loading-spinner {
     width: 17px;
     height: 17px;
@@ -1590,28 +1801,27 @@ body {
         spin 0.8s linear infinite;
 }
 
-
 @keyframes spin {
+
     to {
         transform:
             rotate(360deg);
     }
+
 }
 
 
 /* =========================================================
-   SOURCES SECTION
+   SOURCES
 ========================================================= */
 
 .sources-section {
     margin-top: 30px;
 }
 
-
 .sources-heading {
     margin-bottom: 12px;
 }
-
 
 .sources-list {
     display: flex;
@@ -1620,11 +1830,6 @@ body {
 
     gap: 8px;
 }
-
-
-/* =========================================================
-   SOURCE ITEM
-========================================================= */
 
 .source-item {
     display: flex;
@@ -1649,7 +1854,6 @@ body {
         transform 0.18s ease;
 }
 
-
 .source-item:hover {
     border-color:
         rgba(129, 140, 248, 0.18);
@@ -1660,11 +1864,6 @@ body {
     transform:
         translateY(-1px);
 }
-
-
-/* =========================================================
-   SOURCE NUMBER
-========================================================= */
 
 .source-number {
     width: 25px;
@@ -1689,15 +1888,9 @@ body {
     font-weight: 800;
 }
 
-
-/* =========================================================
-   SOURCE CONTENT
-========================================================= */
-
 .source-content {
     min-width: 0;
 }
-
 
 .source-name {
     color: #bbc5d6;
@@ -1708,7 +1901,6 @@ body {
 
     overflow-wrap: anywhere;
 }
-
 
 .source-preview {
     margin-top: 4px;
@@ -1722,7 +1914,7 @@ body {
 
 
 /* =========================================================
-   MOBILE NAV
+   MOBILE
 ========================================================= */
 
 @media (max-width: 850px) {
@@ -1731,12 +1923,10 @@ body {
         width: 240px;
     }
 
-
     .content-area {
         width:
             calc(100% - 40px);
     }
-
 
     .topbar {
         padding:
@@ -1757,7 +1947,6 @@ body {
         display: none;
     }
 
-
     .content-area {
         width:
             calc(100% - 28px);
@@ -1768,16 +1957,13 @@ body {
             70px;
     }
 
-
     .welcome-section {
         padding-top: 20px;
     }
 
-
     .welcome-section h2 {
         font-size: 29px;
     }
-
 
     .question-box {
         min-height: 60px;
@@ -1785,21 +1971,17 @@ body {
         padding-left: 12px;
     }
 
-
     .input-icon {
         display: none;
     }
-
 
     .ask-button {
         min-width: 48px;
     }
 
-
     #askButtonText {
         display: none;
     }
-
 
     .result-heading {
         align-items: flex-start;
@@ -1807,6 +1989,26 @@ body {
         flex-direction: column;
 
         gap: 9px;
+    }
+
+    .upload-header {
+        align-items: flex-start;
+
+        flex-wrap: wrap;
+    }
+
+    .upload-header-text {
+        flex: 1;
+
+        min-width: 150px;
+    }
+
+    .upload-button {
+        margin-left: auto;
+    }
+
+    .upload-help {
+        padding-left: 0;
     }
 
 }
@@ -1823,23 +2025,19 @@ body {
             calc(100% - 20px);
     }
 
-
     .topbar {
         height: 57px;
     }
 
-
     .mode-toggle {
         width: 100%;
     }
-
 
     .mode-option {
         flex: 1;
 
         justify-content: center;
     }
-
 
     .question-box {
         gap: 6px;
@@ -1848,17 +2046,14 @@ body {
             8px;
     }
 
-
     #questionInput {
         font-size: 12px;
     }
-
 
     .answer-content {
         padding:
             18px;
     }
-
 
     .input-footer {
         flex-wrap: wrap;
@@ -1866,14 +2061,27 @@ body {
         line-height: 1.5;
     }
 
-
     .welcome-section h2 {
         font-size: 27px;
     }
 
-
     .welcome-section p {
         font-size: 12px;
+    }
+
+    .upload-panel {
+        padding:
+            12px;
+    }
+
+    .upload-button {
+        width: 100%;
+
+        margin-top: 4px;
+    }
+
+    .upload-header-text {
+        flex-basis: calc(100% - 50px);
     }
 
 }
