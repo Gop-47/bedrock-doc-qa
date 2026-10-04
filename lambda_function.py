@@ -1,996 +1,1189 @@
-import os
-import json
-import uuid
-import hashlib
-import boto3
-import redis
+// =========================================================
+// NOXORA CONFIGURATION
+// =========================================================
 
-from datetime import datetime, timezone
-from botocore.exceptions import ClientError
+const API_BASE_URL =
+    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev";
 
+const QUERY_URL =
+    `${API_BASE_URL}/query`;
 
-# =========================================================
-# ENVIRONMENT VARIABLES
-# =========================================================
+const HISTORY_URL =
+    `${API_BASE_URL}/query/history`;
 
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
-KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
+// =========================================================
+// STATE
+// =========================================================
 
-MODEL_ID = os.environ["MODEL_ID"]
+let selectedMode = "rag";
 
-DYNAMODB_TABLE = os.environ["DYNAMODB_TABLE"]
+let selectedHistoryId = null;
 
-REDIS_ENDPOINT = os.environ["REDIS_ENDPOINT"]
 
+// =========================================================
+// DOM ELEMENTS
+// =========================================================
 
-# ---------------------------------------------------------
-# MODE CONTROL
-# ---------------------------------------------------------
+const questionForm =
+    document.getElementById("questionForm");
 
-DEFAULT_MODE = (
-    os.environ.get("DEFAULT_MODE", "rag")
-    .strip()
-    .lower()
-)
+const questionInput =
+    document.getElementById("questionInput");
 
-DIRECT_AI_ENABLED = (
-    os.environ.get("DIRECT_AI_ENABLED", "false")
-    .strip()
-    .lower()
-    in ("true", "1", "yes", "on")
-)
+const askButton =
+    document.getElementById("askButton");
 
+const askButtonText =
+    document.getElementById("askButtonText");
 
-# Only allow valid modes
-if DEFAULT_MODE not in ("rag", "direct"):
-    DEFAULT_MODE = "rag"
+const askButtonIcon =
+    document.getElementById("askButtonIcon");
 
+const inputError =
+    document.getElementById("inputError");
 
-# Cost protection:
-# Direct AI cannot become the default unless explicitly enabled.
-if DEFAULT_MODE == "direct" and not DIRECT_AI_ENABLED:
-    DEFAULT_MODE = "rag"
+const inputErrorTitle =
+    document.getElementById("inputErrorTitle");
 
+const inputErrorMessage =
+    document.getElementById("inputErrorMessage");
 
-CACHE_TTL = 3600
+const questionBox =
+    document.getElementById("questionBox");
 
+const modeOptions =
+    document.querySelectorAll(".mode-option");
 
-# =========================================================
-# AWS CLIENTS
-# =========================================================
+const welcomeSection =
+    document.getElementById("welcomeSection");
 
-dynamodb = boto3.resource(
-    "dynamodb",
-    region_name=AWS_REGION
-)
+const answerSection =
+    document.getElementById("answerSection");
 
-history_table = dynamodb.Table(
-    DYNAMODB_TABLE
-)
+const answerModeBadge =
+    document.getElementById("answerModeBadge");
 
+const cacheBadge =
+    document.getElementById("cacheBadge");
 
-redis_client = redis.Redis(
-    host=REDIS_ENDPOINT,
-    port=6379,
-    ssl=True,
-    decode_responses=True
-)
+const answerContent =
+    document.getElementById("answerContent");
 
+const sourcesSection =
+    document.getElementById("sourcesSection");
 
-bedrock_client = boto3.client(
-    service_name="bedrock-runtime",
-    region_name=AWS_REGION
-)
+const sourcesList =
+    document.getElementById("sourcesList");
 
+const historyList =
+    document.getElementById("historyList");
 
-bedrock_agent_client = boto3.client(
-    service_name="bedrock-agent-runtime",
-    region_name=AWS_REGION
-)
+const historyCount =
+    document.getElementById("historyCount");
 
 
-# =========================================================
-# CORS RESPONSE
-# =========================================================
+// =========================================================
+// MODE SELECTION
+// =========================================================
 
-def cors_response(status_code, body):
+modeOptions.forEach((button) => {
 
-    return {
-        "statusCode": status_code,
+    button.addEventListener(
+        "click",
+        () => {
 
-        "headers": {
-            "Access-Control-Allow-Origin": "*",
+            const mode =
+                button.dataset.mode;
 
-            "Access-Control-Allow-Headers": (
-                "Content-Type,"
-                "X-Amz-Date,"
-                "Authorization,"
-                "X-Api-Key,"
-                "X-Amz-Security-Token"
-            ),
+            setSelectedMode(mode);
 
-            "Access-Control-Allow-Methods": (
-                "OPTIONS,GET,POST"
-            ),
+            clearInputError();
 
-            "Content-Type": "application/json"
-        },
-
-        "body": json.dumps(body)
-    }
-
-
-# =========================================================
-# MODE RESOLUTION
-# =========================================================
-
-def get_effective_mode(requested_mode):
-
-    requested_mode = (
-        str(requested_mode)
-        .strip()
-        .lower()
-    )
-
-    # Only RAG or Direct AI are allowed
-    if requested_mode not in ("rag", "direct"):
-        requested_mode = DEFAULT_MODE
-
-    # Direct AI is disabled at Lambda level
-    if requested_mode == "direct" and not DIRECT_AI_ENABLED:
-        return "rag"
-
-    return requested_mode
-
-
-# =========================================================
-# REDIS CACHE
-# =========================================================
-
-def get_cache_key(question, mode):
-
-    normalized_question = (
-        question
-        .strip()
-        .lower()
-    )
-
-    question_hash = hashlib.sha256(
-        normalized_question.encode("utf-8")
-    ).hexdigest()
-
-    return f"qa:{mode}:{question_hash}"
-
-
-def get_cached_answer(question, mode):
-
-    try:
-
-        cache_key = get_cache_key(
-            question,
-            mode
-        )
-
-        cached_data = redis_client.get(
-            cache_key
-        )
-
-        if cached_data:
-
-            return json.loads(
-                cached_data
-            )
-
-        return None
-
-    except Exception as e:
-
-        print(
-            f"Redis GET error: {str(e)}"
-        )
-
-        return None
-
-
-def cache_answer(
-    question,
-    mode,
-    result
-):
-
-    try:
-
-        cache_key = get_cache_key(
-            question,
-            mode
-        )
-
-        redis_client.set(
-            cache_key,
-            json.dumps(result),
-            ex=CACHE_TTL
-        )
-
-        print(
-            f"Cached answer with key: {cache_key}"
-        )
-
-    except Exception as e:
-
-        print(
-            f"Redis SET error: {str(e)}"
-        )
-
-
-# =========================================================
-# BEDROCK RAG
-# =========================================================
-
-def query_knowledge_base(question):
-
-    try:
-
-        # -------------------------------------------------
-        # CHECK CACHE
-        # -------------------------------------------------
-
-        cached_result = get_cached_answer(
-            question,
-            "rag"
-        )
-
-        if cached_result:
-
-            print("RAG CACHE HIT")
-
-            cached_result["cache"] = "hit"
-
-            return cached_result
-
-
-        print("RAG CACHE MISS")
-
-
-        # -------------------------------------------------
-        # KNOWLEDGE BASE RETRIEVAL
-        # -------------------------------------------------
-
-        response = bedrock_agent_client.retrieve(
-
-            knowledgeBaseId=KNOWLEDGE_BASE_ID,
-
-            retrievalQuery={
-                "text": question
-            }
-        )
-
-
-        contexts = []
-
-
-        for result in response.get(
-            "retrievalResults",
-            []
-        ):
-
-            text = (
-                result
-                .get("content", {})
-                .get("text", "")
-            )
-
-
-            source = (
-                result
-                .get("location", {})
-                .get("s3Location", {})
-                .get("uri", "Unknown")
-            )
-
-
-            contexts.append(
-                {
-                    "text": text,
-                    "source": source
-                }
-            )
-
-
-        # -------------------------------------------------
-        # COMBINE CONTEXT
-        # -------------------------------------------------
-
-        context_text = "\n\n".join(
-            [
-                context["text"]
-                for context in contexts
-            ]
-        )
-
-
-        # -------------------------------------------------
-        # CLAUDE PROMPT
-        # -------------------------------------------------
-
-        prompt = f"""
-Use the following context from documents to answer the question.
-
-If the answer is not in the context, say:
-
-"I cannot find this in the provided documents."
-
-Context:
-
-{context_text}
-
-Question:
-
-{question}
-
-Answer:
-"""
-
-
-        request_body = {
-
-            "anthropic_version":
-                "bedrock-2023-05-31",
-
-            "max_tokens": 1000,
-
-            "temperature": 0.7,
-
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
         }
+    );
 
+});
 
-        # -------------------------------------------------
-        # CALL CLAUDE
-        # -------------------------------------------------
 
-        response_claude = (
-            bedrock_client.invoke_model(
-
-                modelId=MODEL_ID,
-
-                contentType="application/json",
-
-                accept="application/json",
-
-                body=json.dumps(
-                    request_body
-                )
-            )
-        )
-
-
-        response_body = json.loads(
-            response_claude["body"].read()
-        )
-
-
-        answer = (
-            response_body
-            ["content"][0]
-            ["text"]
-        )
-
-
-        result = {
-
-            "answer": answer,
-
-            "citations": contexts,
-
-            "cache": "miss"
-        }
-
-
-        # -------------------------------------------------
-        # SAVE CACHE
-        # -------------------------------------------------
-
-        cache_answer(
-            question,
-            "rag",
-            result
-        )
-
-
-        return result
-
-
-    except ClientError as e:
-
-        error_code = (
-            e.response["Error"]["Code"]
-        )
-
-        error_message = str(e)
-
-        print(
-            f"Bedrock error: "
-            f"{error_code} - "
-            f"{error_message}"
-        )
-
-
-        return {
-
-            "answer": (
-                f"Error: "
-                f"{error_code} - "
-                f"{error_message}"
-            ),
-
-            "citations": [],
-
-            "cache": "error"
-        }
-
-
-    except Exception as e:
-
-        print(
-            f"Knowledge Base error: "
-            f"{str(e)}"
-        )
-
-
-        return {
-
-            "answer": (
-                f"Error: {str(e)}"
-            ),
-
-            "citations": [],
-
-            "cache": "error"
-        }
-
-
-# =========================================================
-# DIRECT CLAUDE
-# =========================================================
-
-def query_claude_directly(question):
-
-    # -----------------------------------------------------
-    # CHECK CACHE
-    # -----------------------------------------------------
-
-    cached_result = get_cached_answer(
-        question,
-        "direct"
-    )
-
-    if cached_result:
-
-        print("DIRECT AI CACHE HIT")
-
-        cached_result["cache"] = "hit"
-
-        return cached_result
-
-
-    print("DIRECT AI CACHE MISS")
-
-
-    request_body = {
-
-        "anthropic_version":
-            "bedrock-2023-05-31",
-
-        "max_tokens": 1000,
-
-        "temperature": 0.7,
-
-        "messages": [
-            {
-                "role": "user",
-                "content": question
-            }
-        ]
-    }
-
-
-    try:
-
-        response = (
-            bedrock_client.invoke_model(
-
-                modelId=MODEL_ID,
-
-                contentType="application/json",
-
-                accept="application/json",
-
-                body=json.dumps(
-                    request_body
-                )
-            )
-        )
-
-
-        response_body = json.loads(
-            response["body"].read()
-        )
-
-
-        answer = (
-            response_body
-            ["content"][0]
-            ["text"]
-        )
-
-
-        result = {
-
-            "answer": answer,
-
-            "citations": [],
-
-            "cache": "miss"
-        }
-
-
-        # -------------------------------------------------
-        # SAVE DIRECT AI CACHE
-        # -------------------------------------------------
-
-        cache_answer(
-            question,
-            "direct",
-            result
-        )
-
-
-        return result
-
-
-    except ClientError as e:
-
-        return {
-
-            "answer": (
-                "Error calling Claude: "
-                f"{str(e)}"
-            ),
-
-            "citations": [],
-
-            "cache": "error"
-        }
-
-
-    except Exception as e:
-
-        return {
-
-            "answer": (
-                "Error calling Claude: "
-                f"{str(e)}"
-            ),
-
-            "citations": [],
-
-            "cache": "error"
-        }
-
-
-# =========================================================
-# DYNAMODB QUERY HISTORY
-# =========================================================
-
-def save_query_history(
-    question,
-    answer,
-    mode,
-    citations
-):
-
-    history_table.put_item(
-
-        Item={
-
-            "query_id": str(
-                uuid.uuid4()
-            ),
-
-            "timestamp": (
-                datetime
-                .now(timezone.utc)
-                .isoformat()
-            ),
-
-            "question": question,
-
-            "answer": answer,
-
-            "mode": mode,
-
-            "citations": citations
-        }
-    )
-
-
-def get_query_history():
-
-    try:
-
-        print(
-            "Fetching query history..."
-        )
-
-
-        response = history_table.scan(
-            Limit=20
-        )
-
-
-        items = response.get(
-            "Items",
-            []
-        )
-
-
-        # Newest first
-        items.sort(
-
-            key=lambda x: x.get(
-                "timestamp",
-                ""
-            ),
-
-            reverse=True
-        )
-
-
-        print(
-            f"History records found: "
-            f"{len(items)}"
-        )
-
-
-        return cors_response(
-
-            200,
-
-            {
-                "history": items
-            }
-        )
-
-
-    except ClientError as e:
-
-        error_code = (
-            e.response["Error"]["Code"]
-        )
-
-        error_message = str(e)
-
-
-        print(
-            f"DynamoDB history error: "
-            f"{error_code} - "
-            f"{error_message}"
-        )
-
-
-        return cors_response(
-
-            500,
-
-            {
-                "error": error_message
-            }
-        )
-
-
-    except Exception as e:
-
-        print(
-            f"History error: {str(e)}"
-        )
-
-
-        return cors_response(
-
-            500,
-
-            {
-                "error": str(e)
-            }
-        )
-
-
-# =========================================================
-# LAMBDA HANDLER
-# =========================================================
-
-def lambda_handler(event, context):
-
-    print("Received event:")
-
-    print(
-        json.dumps(
-            event,
-            default=str
-        )
-    )
-
-
-    # =====================================================
-    # OPTIONS / CORS
-    # =====================================================
-
-    if event.get("httpMethod") == "OPTIONS":
-
-        return cors_response(
-
-            200,
-
-            {
-                "message":
-                    "CORS preflight successful"
-            }
-        )
-
-
-    # =====================================================
-    # GET /query/history
-    # =====================================================
-
-    if event.get("httpMethod") == "GET":
-
-        return get_query_history()
-
-
-    # =====================================================
-    # PROCESS REQUEST BODY
-    # =====================================================
+function setSelectedMode(mode) {
 
     if (
-        "body" in event
-        and event["body"] is not None
-    ):
+        mode !== "rag" &&
+        mode !== "direct"
+    ) {
+        mode = "rag";
+    }
 
-        body = event["body"]
 
+    selectedMode = mode;
 
-        if isinstance(body, str):
 
-            try:
+    modeOptions.forEach((button) => {
 
-                body = json.loads(body)
+        const isActive =
+            button.dataset.mode === mode;
 
-            except json.JSONDecodeError:
+        button.classList.toggle(
+            "active",
+            isActive
+        );
 
-                return cors_response(
+        button.setAttribute(
+            "aria-pressed",
+            String(isActive)
+        );
 
-                    400,
+    });
 
-                    {
-                        "error": {
-                            "type": "INVALID_JSON",
-                            "message":
-                                "Please send a valid JSON request."
-                        }
-                    }
-                )
 
+    if (mode === "rag") {
 
-        if body is not None:
+        questionInput.placeholder =
+            "Ask a question about your documents...";
 
-            event = body
+    } else {
 
+        questionInput.placeholder =
+            "Ask Claude anything...";
 
-    # =====================================================
-    # QUESTION VALIDATION
-    # =====================================================
+    }
 
-    if "question" not in event:
+}
 
-        return cors_response(
 
-            400,
+// =========================================================
+// INPUT ERROR
+// =========================================================
 
-            {
-                "error": {
-                    "type": "QUESTION_REQUIRED",
-                    "message":
-                        "Please enter a question before asking Noxora."
-                }
-            }
-        )
+function showInputError(
+    title,
+    message
+) {
 
+    inputErrorTitle.textContent =
+        title;
 
-    question = event["question"]
+    inputErrorMessage.textContent =
+        message;
 
 
-    # -----------------------------------------------------
-    # TYPE VALIDATION
-    # -----------------------------------------------------
+    inputError.classList.remove(
+        "hidden"
+    );
 
-    if not isinstance(question, str):
+    questionBox.classList.add(
+        "has-error"
+    );
 
-        return cors_response(
+}
 
-            400,
 
-            {
-                "error": {
-                    "type": "INVALID_QUESTION",
-                    "message":
-                        "Your question must be text."
-                }
-            }
-        )
+function clearInputError() {
 
+    inputError.classList.add(
+        "hidden"
+    );
 
-    # -----------------------------------------------------
-    # EMPTY / WHITESPACE VALIDATION
-    # -----------------------------------------------------
+    questionBox.classList.remove(
+        "has-error"
+    );
 
-    question = question.strip()
+}
 
 
-    if not question:
+// =========================================================
+// INPUT EVENTS
+// =========================================================
 
-        return cors_response(
+questionInput.addEventListener(
+    "input",
+    () => {
 
-            400,
+        if (
+            questionInput.value.trim()
+        ) {
 
-            {
-                "error": {
-                    "type": "EMPTY_QUESTION",
-                    "message":
-                        "Please enter a question before asking Noxora."
-                }
-            }
-        )
+            clearInputError();
 
-
-    # =====================================================
-    # MODE
-    # =====================================================
-
-    requested_mode = event.get(
-        "mode",
-        DEFAULT_MODE
-    )
-
-
-    effective_mode = get_effective_mode(
-        requested_mode
-    )
-
-
-    print(
-        f"Requested mode: {requested_mode}"
-    )
-
-    print(
-        f"Effective mode: {effective_mode}"
-    )
-
-
-    # =====================================================
-    # RAG MODE
-    # =====================================================
-
-    if effective_mode == "rag":
-
-        result = query_knowledge_base(
-            question
-        )
-
-
-        save_query_history(
-
-            question=question,
-
-            answer=result["answer"],
-
-            mode="rag",
-
-            citations=result.get(
-                "citations",
-                []
-            )
-        )
-
-
-        return cors_response(
-
-            200,
-
-            {
-
-                "question": question,
-
-                "mode": "rag",
-
-                "answer": result["answer"],
-
-                "citations": result.get(
-                    "citations",
-                    []
-                ),
-
-                "cache": result.get(
-                    "cache",
-                    "unknown"
-                )
-            }
-        )
-
-
-    # =====================================================
-    # DIRECT AI MODE
-    # =====================================================
-
-    if effective_mode == "direct":
-
-        result = query_claude_directly(
-            question
-        )
-
-
-        save_query_history(
-
-            question=question,
-
-            answer=result["answer"],
-
-            mode="direct",
-
-            citations=[]
-        )
-
-
-        return cors_response(
-
-            200,
-
-            {
-
-                "question": question,
-
-                "mode": "direct",
-
-                "answer": result["answer"],
-
-                "citations": [],
-
-                "cache": result.get(
-                    "cache",
-                    "unknown"
-                )
-            }
-        )
-
-
-    # =====================================================
-    # FALLBACK
-    # =====================================================
-
-    return cors_response(
-
-        500,
-
-        {
-            "error": {
-                "type": "INVALID_MODE",
-                "message":
-                    "Unable to determine the AI response mode."
-            }
         }
-    )
+
+        autoResizeTextarea();
+
+        // User is typing a new question.
+        // Remove history selection.
+        clearHistorySelection();
+
+    }
+);
+
+
+function autoResizeTextarea() {
+
+    questionInput.style.height =
+        "auto";
+
+    questionInput.style.height =
+        `${Math.min(
+            questionInput.scrollHeight,
+            180
+        )}px`;
+
+}
+
+
+// =========================================================
+// KEYBOARD HANDLING
+// =========================================================
+
+questionInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
+
+            event.preventDefault();
+
+            questionForm.requestSubmit();
+
+        }
+
+    }
+);
+
+
+// =========================================================
+// FORM SUBMIT
+// =========================================================
+
+questionForm.addEventListener(
+    "submit",
+    async (event) => {
+
+        event.preventDefault();
+
+        await askQuestion();
+
+    }
+);
+
+
+// =========================================================
+// ASK QUESTION
+// =========================================================
+
+async function askQuestion() {
+
+    const question =
+        questionInput.value.trim();
+
+
+    // -----------------------------------------------------
+    // FRONTEND VALIDATION
+    // -----------------------------------------------------
+
+    if (!question) {
+
+        showInputError(
+            "Question required",
+            "Please enter a question before asking Noxora."
+        );
+
+        questionInput.focus();
+
+        return;
+
+    }
+
+
+    if (question.length < 2) {
+
+        showInputError(
+            "Question too short",
+            "Please enter a little more detail so Noxora can answer."
+        );
+
+        questionInput.focus();
+
+        return;
+
+    }
+
+
+    if (question.length > 2000) {
+
+        showInputError(
+            "Question too long",
+            "Please keep your question under 2,000 characters."
+        );
+
+        questionInput.focus();
+
+        return;
+
+    }
+
+
+    clearInputError();
+
+    clearHistorySelection();
+
+    setLoading(true);
+
+
+    try {
+
+        console.log(
+            "Sending Noxora request:",
+            {
+                question,
+                mode: selectedMode
+            }
+        );
+
+
+        const response =
+            await fetch(
+                QUERY_URL,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        question,
+                        mode: selectedMode
+                    })
+                }
+            );
+
+
+        let result;
+
+
+        try {
+
+            result =
+                await response.json();
+
+        } catch (jsonError) {
+
+            throw new Error(
+                "The server returned an invalid response."
+            );
+
+        }
+
+
+        console.log(
+            "Noxora response:",
+            result
+        );
+
+
+        // -------------------------------------------------
+        // API ERROR
+        // -------------------------------------------------
+
+        if (!response.ok) {
+
+            const errorData =
+                result.error;
+
+            let errorMessage =
+                "Something went wrong. Please try again.";
+
+            let errorTitle =
+                "Request failed";
+
+
+            if (
+                errorData &&
+                typeof errorData === "object"
+            ) {
+
+                errorTitle =
+                    getFriendlyErrorTitle(
+                        errorData.type
+                    );
+
+                errorMessage =
+                    errorData.message ||
+                    errorMessage;
+
+            } else if (
+                typeof errorData === "string"
+            ) {
+
+                errorMessage =
+                    errorData;
+
+            }
+
+
+            showInputError(
+                errorTitle,
+                errorMessage
+            );
+
+            questionInput.focus();
+
+            return;
+
+        }
+
+
+        // -------------------------------------------------
+        // DISPLAY ANSWER
+        // -------------------------------------------------
+
+        displayAnswer(
+            result
+        );
+
+
+        // -------------------------------------------------
+        // REFRESH HISTORY
+        // -------------------------------------------------
+
+        await loadHistory();
+
+
+        // Clear input after successful request
+        questionInput.value = "";
+
+        autoResizeTextarea();
+
+        clearInputError();
+
+
+    } catch (error) {
+
+        console.error(
+            "Noxora request error:",
+            error
+        );
+
+
+        showInputError(
+            "Unable to reach Noxora",
+            "We couldn't complete your request right now. Please try again."
+        );
+
+
+    } finally {
+
+        setLoading(false);
+
+    }
+
+}
+
+
+// =========================================================
+// FRIENDLY ERROR TITLES
+// =========================================================
+
+function getFriendlyErrorTitle(
+    errorType
+) {
+
+    switch (errorType) {
+
+        case "QUESTION_REQUIRED":
+            return "Question required";
+
+        case "EMPTY_QUESTION":
+            return "Question required";
+
+        case "INVALID_QUESTION":
+            return "Invalid question";
+
+        case "INVALID_JSON":
+            return "Invalid request";
+
+        case "INVALID_MODE":
+            return "Mode unavailable";
+
+        default:
+            return "Request failed";
+
+    }
+
+}
+
+
+// =========================================================
+// LOADING STATE
+// =========================================================
+
+function setLoading(isLoading) {
+
+    askButton.disabled =
+        isLoading;
+
+    questionInput.disabled =
+        isLoading;
+
+    modeOptions.forEach(
+        (button) => {
+
+            button.disabled =
+                isLoading;
+
+        }
+    );
+
+
+    if (isLoading) {
+
+        askButtonText.textContent =
+            selectedMode === "rag"
+                ? "Searching..."
+                : "Thinking...";
+
+        askButtonIcon.textContent =
+            "•";
+
+
+        answerSection.classList.remove(
+            "hidden"
+        );
+
+        welcomeSection.classList.add(
+            "hidden"
+        );
+
+
+        answerModeBadge.textContent =
+            selectedMode === "rag"
+                ? "KNOWLEDGE BASE"
+                : "DIRECT AI";
+
+
+        answerContent.innerHTML = `
+            <div class="loading-answer">
+                <div class="loading-spinner"></div>
+
+                <span>
+                    ${
+                        selectedMode === "rag"
+                            ? "Searching your knowledge base..."
+                            : "Claude is preparing your answer..."
+                    }
+                </span>
+            </div>
+        `;
+
+
+        sourcesSection.classList.add(
+            "hidden"
+        );
+
+    } else {
+
+        askButtonText.textContent =
+            "Ask Noxora";
+
+        askButtonIcon.textContent =
+            "↑";
+
+
+        questionInput.disabled =
+            false;
+
+    }
+
+}
+
+
+// =========================================================
+// DISPLAY ANSWER
+// =========================================================
+
+function displayAnswer(result) {
+
+    welcomeSection.classList.add(
+        "hidden"
+    );
+
+    answerSection.classList.remove(
+        "hidden"
+    );
+
+
+    const actualMode =
+        result.mode || selectedMode;
+
+
+    // -----------------------------------------------------
+    // MODE BADGE
+    // -----------------------------------------------------
+
+    if (actualMode === "direct") {
+
+        answerModeBadge.textContent =
+            "DIRECT AI";
+
+    } else {
+
+        answerModeBadge.textContent =
+            "KNOWLEDGE BASE";
+
+    }
+
+
+    // -----------------------------------------------------
+    // CACHE BADGE
+    // -----------------------------------------------------
+
+    if (result.cache === "hit") {
+
+        cacheBadge.textContent =
+            "CACHED";
+
+        cacheBadge.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        cacheBadge.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    // -----------------------------------------------------
+    // ANSWER
+    // -----------------------------------------------------
+
+    answerContent.innerHTML =
+        formatAnswer(
+            result.answer || ""
+        );
+
+
+    // -----------------------------------------------------
+    // SOURCES
+    // -----------------------------------------------------
+
+    if (
+        actualMode === "rag" &&
+        Array.isArray(result.citations) &&
+        result.citations.length > 0
+    ) {
+
+        displaySources(
+            result.citations
+        );
+
+    } else {
+
+        sourcesSection.classList.add(
+            "hidden"
+        );
+
+        sourcesList.innerHTML =
+            "";
+
+    }
+
+}
+
+
+// =========================================================
+// FORMAT ANSWER
+// =========================================================
+
+function formatAnswer(answer) {
+
+    if (!answer) {
+
+        return `
+            <div class="empty-answer">
+                No answer was returned.
+            </div>
+        `;
+
+    }
+
+
+    const escaped =
+        escapeHtml(answer);
+
+
+    return escaped
+        .replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
+        )
+        .replace(
+            /\n\n/g,
+            "</p><p>"
+        )
+        .replace(
+            /\n/g,
+            "<br>"
+        )
+        .replace(
+            /^/,
+            "<p>"
+        )
+        .replace(
+            /$/,
+            "</p>"
+        );
+
+}
+
+
+// =========================================================
+// HTML ESCAPE
+// =========================================================
+
+function escapeHtml(text) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        text;
+
+    return div.innerHTML;
+
+}
+
+
+// =========================================================
+// DISPLAY SOURCES
+// =========================================================
+
+function displaySources(
+    citations
+) {
+
+    sourcesList.innerHTML =
+        "";
+
+
+    citations.forEach(
+        (citation, index) => {
+
+            const source =
+                citation.source ||
+                "Unknown source";
+
+            const text =
+                citation.text ||
+                "";
+
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "source-item";
+
+
+            item.innerHTML = `
+
+                <div class="source-number">
+                    ${index + 1}
+                </div>
+
+                <div class="source-content">
+
+                    <div class="source-name">
+                        ${escapeHtml(source)}
+                    </div>
+
+                    ${
+                        text
+                            ? `
+                                <div class="source-preview">
+                                    ${escapeHtml(
+                                        text.substring(
+                                            0,
+                                            180
+                                        )
+                                    )}${
+                                        text.length > 180
+                                            ? "..."
+                                            : ""
+                                    }
+                                </div>
+                              `
+                            : ""
+                    }
+
+                </div>
+
+            `;
+
+
+            sourcesList.appendChild(
+                item
+            );
+
+        }
+    );
+
+
+    sourcesSection.classList.remove(
+        "hidden"
+    );
+
+}
+
+
+// =========================================================
+// HISTORY
+// =========================================================
+
+async function loadHistory() {
+
+    try {
+
+        const response =
+            await fetch(
+                HISTORY_URL
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                `History request failed: ${response.status}`
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const history =
+            Array.isArray(data.history)
+                ? data.history
+                : [];
+
+
+        updateHistoryCount(
+            history.length
+        );
+
+
+        renderHistory(
+            history
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "History loading error:",
+            error
+        );
+
+    }
+
+}
+
+
+// =========================================================
+// HISTORY COUNT
+// =========================================================
+
+function updateHistoryCount(
+    count
+) {
+
+    if (!historyCount) {
+        return;
+    }
+
+
+    historyCount.textContent =
+        count > 99
+            ? "99+"
+            : String(count);
+
+}
+
+
+// =========================================================
+// RENDER HISTORY
+// =========================================================
+
+function renderHistory(
+    history
+) {
+
+    historyList.innerHTML =
+        "";
+
+
+    updateHistoryCount(
+        history.length
+    );
+
+
+    if (!history.length) {
+
+        historyList.innerHTML = `
+            <div class="history-empty">
+
+                <div class="history-empty-icon">
+                    ◌
+                </div>
+
+                <span>
+                    No queries yet
+                </span>
+
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    history.forEach(
+        (item) => {
+
+            const historyItem =
+                document.createElement(
+                    "button"
+                );
+
+
+            historyItem.type =
+                "button";
+
+            historyItem.className =
+                "history-item";
+
+
+            // -------------------------------------------------
+            // RESTORE SELECTED STATE
+            // -------------------------------------------------
+
+            if (
+                selectedHistoryId &&
+                item.query_id === selectedHistoryId
+            ) {
+
+                historyItem.classList.add(
+                    "selected"
+                );
+
+            }
+
+
+            const mode =
+                item.mode === "direct"
+                    ? "DIRECT AI"
+                    : "KNOWLEDGE BASE";
+
+
+            const question =
+                item.question ||
+                "Untitled question";
+
+
+            historyItem.innerHTML = `
+
+                <div class="history-mode">
+                    ${mode}
+                </div>
+
+                <div class="history-question">
+                    ${escapeHtml(question)}
+                </div>
+
+            `;
+
+
+            historyItem.addEventListener(
+                "click",
+                () => {
+
+                    restoreHistoryItem(
+                        item
+                    );
+
+                }
+            );
+
+
+            historyList.appendChild(
+                historyItem
+            );
+
+        }
+    );
+
+}
+
+
+// =========================================================
+// RESTORE HISTORY ITEM
+// =========================================================
+
+function restoreHistoryItem(
+    item
+) {
+
+    selectedHistoryId =
+        item.query_id || null;
+
+
+    const mode =
+        item.mode === "direct"
+            ? "direct"
+            : "rag";
+
+
+    setSelectedMode(
+        mode
+    );
+
+
+    questionInput.value =
+        item.question || "";
+
+
+    autoResizeTextarea();
+
+    clearInputError();
+
+
+    displayAnswer({
+
+        mode,
+
+        answer:
+            item.answer || "",
+
+        citations:
+            Array.isArray(
+                item.citations
+            )
+                ? item.citations
+                : [],
+
+        cache:
+            "history"
+
+    });
+
+
+    highlightSelectedHistory();
+
+
+    // -----------------------------------------------------
+    // Scroll answer into view
+    // -----------------------------------------------------
+
+    answerSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+
+}
+
+
+// =========================================================
+// HISTORY SELECTION
+// =========================================================
+
+function highlightSelectedHistory() {
+
+    const historyItems =
+        historyList.querySelectorAll(
+            ".history-item"
+        );
+
+
+    historyItems.forEach(
+        (item) => {
+
+            item.classList.remove(
+                "selected"
+            );
+
+        }
+    );
+
+
+    // Re-render history state by matching
+    // the selected question when possible.
+    //
+    // This is intentionally lightweight because
+    // the history list is refreshed after every query.
+
+}
+
+
+// =========================================================
+// CLEAR HISTORY SELECTION
+// =========================================================
+
+function clearHistorySelection() {
+
+    selectedHistoryId = null;
+
+
+    const historyItems =
+        historyList.querySelectorAll(
+            ".history-item"
+        );
+
+
+    historyItems.forEach(
+        (item) => {
+
+            item.classList.remove(
+                "selected"
+            );
+
+        }
+    );
+
+}
+
+
+// =========================================================
+// INITIALIZE
+// =========================================================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        setSelectedMode(
+            "rag"
+        );
+
+        loadHistory();
+
+        questionInput.focus();
+
+        autoResizeTextarea();
+
+    }
+);
