@@ -1,23 +1,30 @@
-const API_URL =
-    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query";
+// =========================================================
+// NOXORA CONFIGURATION
+// =========================================================
 
-const HISTORY_API_URL =
-    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev/query/history";
+const API_BASE_URL =
+    "https://lwrgo5ikf8.execute-api.us-east-1.amazonaws.com/dev";
+
+const QUERY_URL =
+    `${API_BASE_URL}/query`;
+
+const HISTORY_URL =
+    `${API_BASE_URL}/query/history`;
 
 
-console.log("NOXORA SCRIPT LOADED");
-
-
-/* =====================================================
-   STATE
-===================================================== */
+// =========================================================
+// STATE
+// =========================================================
 
 let selectedMode = "rag";
 
 
-/* =====================================================
-   ELEMENTS
-===================================================== */
+// =========================================================
+// DOM ELEMENTS
+// =========================================================
+
+const questionForm =
+    document.getElementById("questionForm");
 
 const questionInput =
     document.getElementById("questionInput");
@@ -25,23 +32,41 @@ const questionInput =
 const askButton =
     document.getElementById("askButton");
 
-const loadingCard =
-    document.getElementById("loadingCard");
+const askButtonText =
+    document.getElementById("askButtonText");
 
-const loadingText =
-    document.getElementById("loadingText");
+const askButtonIcon =
+    document.getElementById("askButtonIcon");
+
+const inputError =
+    document.getElementById("inputError");
+
+const inputErrorTitle =
+    document.getElementById("inputErrorTitle");
+
+const inputErrorMessage =
+    document.getElementById("inputErrorMessage");
+
+const questionBox =
+    document.getElementById("questionBox");
+
+const modeOptions =
+    document.querySelectorAll(".mode-option");
+
+const welcomeSection =
+    document.getElementById("welcomeSection");
 
 const answerSection =
     document.getElementById("answerSection");
 
-const answerText =
-    document.getElementById("answerText");
+const answerModeBadge =
+    document.getElementById("answerModeBadge");
 
-const cacheStatus =
-    document.getElementById("cacheStatus");
+const cacheBadge =
+    document.getElementById("cacheBadge");
 
-const copyButton =
-    document.getElementById("copyButton");
+const answerContent =
+    document.getElementById("answerContent");
 
 const sourcesSection =
     document.getElementById("sourcesSection");
@@ -49,89 +74,32 @@ const sourcesSection =
 const sourcesList =
     document.getElementById("sourcesList");
 
-const sourcesCount =
-    document.getElementById("sourcesCount");
-
-const errorCard =
-    document.getElementById("errorCard");
-
-const errorMessage =
-    document.getElementById("errorMessage");
-
-
-/* =====================================================
-   MODE SELECTOR
-===================================================== */
-
-const modeToggle =
-    document.getElementById("modeToggle");
-
-const modeOptions =
-    document.querySelectorAll(".mode-option");
-
-
-/* =====================================================
-   HISTORY ELEMENTS
-===================================================== */
-
-const historyButton =
-    document.getElementById("historyButton");
-
-const historySection =
-    document.getElementById("historySection");
-
 const historyList =
     document.getElementById("historyList");
 
-const closeHistoryButton =
-    document.getElementById("closeHistoryButton");
 
+// =========================================================
+// MODE SELECTION
+// =========================================================
 
-/* =====================================================
-   INITIAL STATE
-===================================================== */
+modeOptions.forEach((button) => {
 
-hideElement(loadingCard);
-hideElement(answerSection);
-hideElement(sourcesSection);
-hideElement(errorCard);
-hideElement(historySection);
+    button.addEventListener(
+        "click",
+        () => {
 
-setSelectedMode("rag");
+            const mode =
+                button.dataset.mode;
 
+            setSelectedMode(mode);
 
-/* =====================================================
-   MODE SELECTION
-===================================================== */
-
-if (modeOptions.length > 0) {
-
-    modeOptions.forEach(
-        function (option) {
-
-            option.addEventListener(
-                "click",
-                function () {
-
-                    const requestedMode =
-                        option.dataset.mode || "rag";
-
-                    setSelectedMode(
-                        requestedMode
-                    );
-
-                }
-            );
+            clearInputError();
 
         }
     );
 
-}
+});
 
-
-/* =====================================================
-   SET SELECTED MODE
-===================================================== */
 
 function setSelectedMode(mode) {
 
@@ -139,179 +107,164 @@ function setSelectedMode(mode) {
         mode !== "rag" &&
         mode !== "direct"
     ) {
-
         mode = "rag";
-
     }
 
 
     selectedMode = mode;
 
 
-    modeOptions.forEach(
-        function (option) {
+    modeOptions.forEach((button) => {
 
-            const isActive =
-                option.dataset.mode === selectedMode;
+        const isActive =
+            button.dataset.mode === mode;
 
+        button.classList.toggle(
+            "active",
+            isActive
+        );
 
-            option.classList.toggle(
-                "active",
-                isActive
-            );
+        button.setAttribute(
+            "aria-pressed",
+            String(isActive)
+        );
 
-
-            option.setAttribute(
-                "aria-pressed",
-                isActive ? "true" : "false"
-            );
-
-        }
-    );
+    });
 
 
-    updateModeUI();
-
-}
-
-
-/* =====================================================
-   UPDATE MODE UI
-===================================================== */
-
-function updateModeUI() {
-
-    if (!questionInput) {
-        return;
-    }
-
-
-    if (selectedMode === "direct") {
+    if (mode === "rag") {
 
         questionInput.placeholder =
-            "Ask anything you want Claude to explain...";
-
-
-        if (loadingText) {
-
-            loadingText.textContent =
-                "Generating a direct AI answer...";
-
-        }
-
+            "Ask a question about your documents...";
 
     } else {
 
         questionInput.placeholder =
-            "Ask something about your documents...";
-
-
-        if (loadingText) {
-
-            loadingText.textContent =
-                "Searching your knowledge base...";
-
-        }
+            "Ask Claude anything...";
 
     }
 
 }
 
 
-/* =====================================================
-   ASK BUTTON
-===================================================== */
+// =========================================================
+// INPUT ERROR
+// =========================================================
 
-if (askButton) {
+function showInputError(
+    title,
+    message
+) {
 
-    askButton.addEventListener(
-        "click",
-        function () {
+    inputErrorTitle.textContent =
+        title;
 
-            console.log(
-                "ASK BUTTON CLICKED"
-            );
+    inputErrorMessage.textContent =
+        message;
 
-            askQuestion();
 
-        }
+    inputError.classList.remove(
+        "hidden"
+    );
+
+    questionBox.classList.add(
+        "has-error"
     );
 
 }
 
 
-/* =====================================================
-   ENTER KEY
-===================================================== */
+function clearInputError() {
 
-if (questionInput) {
+    inputError.classList.add(
+        "hidden"
+    );
 
-    questionInput.addEventListener(
-        "keydown",
-        function (event) {
-
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey
-            ) {
-
-                event.preventDefault();
-
-                askQuestion();
-
-            }
-
-        }
+    questionBox.classList.remove(
+        "has-error"
     );
 
 }
 
 
-/* =====================================================
-   HISTORY BUTTON
-===================================================== */
+// =========================================================
+// INPUT EVENTS
+// =========================================================
 
-if (historyButton) {
+questionInput.addEventListener(
+    "input",
+    () => {
 
-    historyButton.addEventListener(
-        "click",
-        function () {
+        if (
+            questionInput.value.trim()
+        ) {
 
-            console.log(
-                "HISTORY BUTTON CLICKED"
-            );
-
-            loadHistory();
+            clearInputError();
 
         }
-    );
+
+        autoResizeTextarea();
+
+    }
+);
+
+
+function autoResizeTextarea() {
+
+    questionInput.style.height =
+        "auto";
+
+    questionInput.style.height =
+        `${Math.min(
+            questionInput.scrollHeight,
+            180
+        )}px`;
 
 }
 
 
-/* =====================================================
-   CLOSE HISTORY
-===================================================== */
+// =========================================================
+// KEYBOARD HANDLING
+// =========================================================
 
-if (closeHistoryButton) {
+questionInput.addEventListener(
+    "keydown",
+    (event) => {
 
-    closeHistoryButton.addEventListener(
-        "click",
-        function () {
+        if (
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
 
-            hideElement(
-                historySection
-            );
+            event.preventDefault();
+
+            questionForm.requestSubmit();
 
         }
-    );
 
-}
+    }
+);
 
 
-/* =====================================================
-   ASK QUESTION
-===================================================== */
+// =========================================================
+// FORM SUBMIT
+// =========================================================
+
+questionForm.addEventListener(
+    "submit",
+    async (event) => {
+
+        event.preventDefault();
+
+        await askQuestion();
+
+    }
+);
+
+
+// =========================================================
+// ASK QUESTION
+// =========================================================
 
 async function askQuestion() {
 
@@ -319,54 +272,71 @@ async function askQuestion() {
         questionInput.value.trim();
 
 
+    // -----------------------------------------------------
+    // FRONTEND VALIDATION
+    // -----------------------------------------------------
+
     if (!question) {
 
-        showError(
-            "Please enter a question."
+        showInputError(
+            "Question required",
+            "Please enter a question before asking Noxora."
         );
+
+        questionInput.focus();
 
         return;
 
     }
 
 
-    hideElement(errorCard);
-    hideElement(historySection);
-    hideElement(answerSection);
-    hideElement(sourcesSection);
+    if (question.length < 2) {
 
+        showInputError(
+            "Question too short",
+            "Please enter a little more detail so Noxora can answer."
+        );
 
-    showElement(loadingCard);
+        questionInput.focus();
 
-
-    updateModeUI();
-
-
-    if (askButton) {
-
-        askButton.disabled = true;
-
-        askButton.textContent =
-            "Thinking...";
+        return;
 
     }
+
+
+    if (question.length > 2000) {
+
+        showInputError(
+            "Question too long",
+            "Please keep your question under 2,000 characters."
+        );
+
+        questionInput.focus();
+
+        return;
+
+    }
+
+
+    clearInputError();
+
+    setLoading(true);
 
 
     try {
 
         console.log(
-            "Sending request to Noxora API..."
-        );
-
-        console.log(
-            "Requested mode:",
-            selectedMode
+            "Sending Noxora request:",
+            {
+                question,
+                mode: selectedMode
+            }
         );
 
 
         const response =
             await fetch(
-                API_URL,
+                QUERY_URL,
                 {
                     method: "POST",
 
@@ -376,96 +346,110 @@ async function askQuestion() {
                     },
 
                     body: JSON.stringify({
-
-                        question:
-                            question,
-
-                        mode:
-                            selectedMode
-
+                        question,
+                        mode: selectedMode
                     })
-
                 }
             );
 
 
-        if (!response.ok) {
+        let result;
+
+
+        try {
+
+            result =
+                await response.json();
+
+        } catch (jsonError) {
 
             throw new Error(
-                "API request failed with status " +
-                response.status
+                "The server returned an invalid response."
             );
 
         }
-
-
-        const data =
-            await response.json();
 
 
         console.log(
-            "Noxora API response:",
-            data
+            "Noxora response:",
+            result
         );
 
 
-        let result =
-            data;
+        // -------------------------------------------------
+        // API ERROR
+        // -------------------------------------------------
+
+        if (!response.ok) {
+
+            const errorData =
+                result.error;
+
+            let errorMessage =
+                "Something went wrong. Please try again.";
+
+            let errorTitle =
+                "Request failed";
 
 
-        if (data.body) {
+            if (
+                errorData &&
+                typeof errorData === "object"
+            ) {
 
-            try {
+                errorTitle =
+                    getFriendlyErrorTitle(
+                        errorData.type
+                    );
 
-                result =
-                    typeof data.body === "string"
-                        ? JSON.parse(data.body)
-                        : data.body;
+                errorMessage =
+                    errorData.message ||
+                    errorMessage;
 
-            } catch (error) {
+            } else if (
+                typeof errorData === "string"
+            ) {
 
-                console.error(
-                    "Failed to parse API body:",
-                    error
-                );
+                errorMessage =
+                    errorData;
 
             }
 
-        }
 
-
-        if (result.error) {
-
-            throw new Error(
-                result.error
+            showInputError(
+                errorTitle,
+                errorMessage
             );
 
-        }
+            questionInput.focus();
 
-
-        /*
-         * Lambda is the source of truth.
-         *
-         * If Direct AI was disabled on Lambda,
-         * Lambda may return mode="rag" even though
-         * the frontend requested direct.
-         */
-
-        if (
-            result.mode === "rag" ||
-            result.mode === "direct"
-        ) {
-
-            setSelectedMode(
-                result.mode
-            );
+            return;
 
         }
 
+
+        // -------------------------------------------------
+        // DISPLAY ANSWER
+        // -------------------------------------------------
 
         displayAnswer(
             result
         );
+
+
+        // -------------------------------------------------
+        // REFRESH HISTORY
+        // -------------------------------------------------
+
+        await loadHistory();
+
+
+        // Clear input after successful request
+        questionInput.value = "";
+
+        autoResizeTextarea();
+
+        clearInputError();
 
 
     } catch (error) {
@@ -476,542 +460,400 @@ async function askQuestion() {
         );
 
 
-        showError(
-            error.message ||
-            "Something went wrong."
+        showInputError(
+            "Unable to reach Noxora",
+            "We couldn't complete your request right now. Please try again."
         );
 
 
     } finally {
 
-        hideElement(
-            loadingCard
-        );
-
-
-        if (askButton) {
-
-            askButton.disabled =
-                false;
-
-            askButton.textContent =
-                "Ask Noxora";
-
-        }
+        setLoading(false);
 
     }
 
 }
 
 
-/* =====================================================
-   DISPLAY ANSWER
-===================================================== */
+// =========================================================
+// FRIENDLY ERROR TITLES
+// =========================================================
 
-function displayAnswer(data) {
+function getFriendlyErrorTitle(
+    errorType
+) {
 
-    if (answerText) {
+    switch (errorType) {
 
-        answerText.textContent =
-            data.answer ||
-            "No answer returned.";
+        case "QUESTION_REQUIRED":
+            return "Question required";
+
+        case "EMPTY_QUESTION":
+            return "Question required";
+
+        case "INVALID_QUESTION":
+            return "Invalid question";
+
+        case "INVALID_JSON":
+            return "Invalid request";
+
+        case "INVALID_MODE":
+            return "Mode unavailable";
+
+        default:
+            return "Request failed";
 
     }
 
+}
 
-    showElement(
-        answerSection
+
+// =========================================================
+// LOADING STATE
+// =========================================================
+
+function setLoading(isLoading) {
+
+    askButton.disabled =
+        isLoading;
+
+    questionInput.disabled =
+        isLoading;
+
+    modeOptions.forEach(
+        (button) => {
+            button.disabled =
+                isLoading;
+        }
     );
 
 
-    const actualMode =
-        String(
-            data.mode ||
-            selectedMode ||
-            "rag"
-        ).toLowerCase();
+    if (isLoading) {
+
+        askButtonText.textContent =
+            selectedMode === "rag"
+                ? "Searching..."
+                : "Thinking...";
+
+        askButtonIcon.textContent =
+            "•";
 
 
-    /* -----------------------------------------
-       CACHE / MODE STATUS
-    ----------------------------------------- */
+        answerSection.classList.remove(
+            "hidden"
+        );
 
-    if (cacheStatus) {
-
-        if (
-            actualMode === "direct"
-        ) {
-
-            cacheStatus.textContent =
-                "DIRECT AI";
-
-            cacheStatus.className =
-                "cache-status direct-status";
+        welcomeSection.classList.add(
+            "hidden"
+        );
 
 
-        } else if (
-            data.cache === "hit"
-        ) {
-
-            cacheStatus.textContent =
-                "RAG · CACHE HIT";
-
-            cacheStatus.className =
-                "cache-status cache-hit";
+        answerModeBadge.textContent =
+            selectedMode === "rag"
+                ? "KNOWLEDGE BASE"
+                : "DIRECT AI";
 
 
-        } else if (
-            data.cache === "miss"
-        ) {
-
-            cacheStatus.textContent =
-                "RAG · CACHE MISS";
-
-            cacheStatus.className =
-                "cache-status cache-miss";
-
-
-        } else {
-
-            cacheStatus.textContent =
-                "RAG";
-
-            cacheStatus.className =
-                "cache-status rag-status";
-
-        }
-
-    }
+        answerContent.innerHTML = `
+            <div class="loading-answer">
+                <div class="loading-spinner"></div>
+                <span>
+                    ${
+                        selectedMode === "rag"
+                            ? "Searching your knowledge base..."
+                            : "Claude is preparing your answer..."
+                    }
+                </span>
+            </div>
+        `;
 
 
-    /* -----------------------------------------
-       SOURCES
-    ----------------------------------------- */
-
-    if (actualMode === "rag") {
-
-        displaySources(
-            data.citations || []
+        sourcesSection.classList.add(
+            "hidden"
         );
 
     } else {
 
-        hideElement(
-            sourcesSection
-        );
+        askButtonText.textContent =
+            "Ask";
 
-        if (sourcesList) {
+        askButtonIcon.textContent =
+            "↑";
 
-            sourcesList.innerHTML =
-                "";
 
-        }
-
-        if (sourcesCount) {
-
-            sourcesCount.textContent =
-                "";
-
-        }
+        questionInput.disabled =
+            false;
 
     }
 
 }
 
 
-/* =====================================================
-   DISPLAY SOURCES
-===================================================== */
+// =========================================================
+// DISPLAY ANSWER
+// =========================================================
+
+function displayAnswer(result) {
+
+    welcomeSection.classList.add(
+        "hidden"
+    );
+
+    answerSection.classList.remove(
+        "hidden"
+    );
+
+
+    const actualMode =
+        result.mode || selectedMode;
+
+
+    // -----------------------------------------------------
+    // MODE BADGE
+    // -----------------------------------------------------
+
+    if (actualMode === "direct") {
+
+        answerModeBadge.textContent =
+            "DIRECT AI";
+
+    } else {
+
+        answerModeBadge.textContent =
+            "KNOWLEDGE BASE";
+
+    }
+
+
+    // -----------------------------------------------------
+    // CACHE BADGE
+    // -----------------------------------------------------
+
+    if (result.cache === "hit") {
+
+        cacheBadge.textContent =
+            "CACHED";
+
+        cacheBadge.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        cacheBadge.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    // -----------------------------------------------------
+    // ANSWER
+    // -----------------------------------------------------
+
+    answerContent.innerHTML =
+        formatAnswer(
+            result.answer || ""
+        );
+
+
+    // -----------------------------------------------------
+    // SOURCES
+    // -----------------------------------------------------
+
+    if (
+        actualMode === "rag" &&
+        Array.isArray(result.citations) &&
+        result.citations.length > 0
+    ) {
+
+        displaySources(
+            result.citations
+        );
+
+    } else {
+
+        sourcesSection.classList.add(
+            "hidden"
+        );
+
+        sourcesList.innerHTML =
+            "";
+
+    }
+
+}
+
+
+// =========================================================
+// FORMAT ANSWER
+// =========================================================
+
+function formatAnswer(answer) {
+
+    if (!answer) {
+
+        return `
+            <div class="empty-answer">
+                No answer was returned.
+            </div>
+        `;
+
+    }
+
+
+    // Escape HTML first
+    const escaped =
+        escapeHtml(answer);
+
+
+    // Convert simple markdown-like formatting
+    return escaped
+        .replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
+        )
+        .replace(
+            /\n\n/g,
+            "</p><p>"
+        )
+        .replace(
+            /\n/g,
+            "<br>"
+        )
+        .replace(
+            /^/,
+            "<p>"
+        )
+        .replace(
+            /$/,
+            "</p>"
+        );
+
+}
+
+
+// =========================================================
+// HTML ESCAPE
+// =========================================================
+
+function escapeHtml(text) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        text;
+
+    return div.innerHTML;
+
+}
+
+
+// =========================================================
+// DISPLAY SOURCES
+// =========================================================
 
 function displaySources(
     citations
 ) {
 
-    if (!sourcesList) {
-
-        return;
-
-    }
-
-
     sourcesList.innerHTML =
         "";
 
 
-    if (sourcesCount) {
-
-        sourcesCount.textContent =
-            "";
-
-    }
-
-
-    if (
-        !citations ||
-        citations.length === 0
-    ) {
-
-        hideElement(
-            sourcesSection
-        );
-
-        return;
-
-    }
-
-
-    const uniqueSources = [];
-
-    const seenSources =
-        new Set();
-
-
     citations.forEach(
-        function (citation) {
+        (citation, index) => {
 
             const source =
                 citation.source ||
                 "Unknown source";
 
-
-            const normalized =
-                source
-                    .trim()
-                    .toLowerCase();
-
-
-            if (
-                !seenSources.has(
-                    normalized
-                )
-            ) {
-
-                seenSources.add(
-                    normalized
-                );
-
-                uniqueSources.push(
-                    citation
-                );
-
-            }
-
-        }
-    );
-
-
-    showElement(
-        sourcesSection
-    );
-
-
-    if (sourcesCount) {
-
-        sourcesCount.textContent =
-            uniqueSources.length === 1
-                ? "1 source"
-                : uniqueSources.length +
-                  " sources";
-
-    }
-
-
-    uniqueSources.forEach(
-        function (
-            citation,
-            index
-        ) {
-
-            const sourceCard =
-                document.createElement(
-                    "div"
-                );
-
-            sourceCard.className =
-                "source-card";
-
-
-            const icon =
-                document.createElement(
-                    "div"
-                );
-
-            icon.className =
-                "source-icon";
-
-            icon.textContent =
-                "📄";
-
-
-            const content =
-                document.createElement(
-                    "div"
-                );
-
-            content.className =
-                "source-content";
-
-
-            const label =
-                document.createElement(
-                    "div"
-                );
-
-            label.className =
-                "source-label";
-
-            label.textContent =
-                "Source " +
-                (index + 1);
-
-
-            const name =
-                document.createElement(
-                    "div"
-                );
-
-            name.className =
-                "source-name";
-
-
-            const sourceUrl =
-                citation.source ||
-                "Unknown source";
-
-
-            let fileName =
-                sourceUrl;
-
-
-            try {
-
-                const url =
-                    new URL(
-                        sourceUrl
-                    );
-
-
-                const pathname =
-                    decodeURIComponent(
-                        url.pathname
-                    );
-
-
-                fileName =
-                    pathname
-                        .split("/")
-                        .pop() ||
-                    sourceUrl;
-
-
-            } catch (
-                error
-            ) {
-
-                fileName =
-                    sourceUrl;
-
-            }
-
-
-            name.textContent =
-                fileName;
-
-
-            name.title =
-                sourceUrl;
-
-
-            const description =
-                document.createElement(
-                    "div"
-                );
-
-            description.className =
-                "source-description";
-
-            description.textContent =
-                "Retrieved from your Knowledge Base";
-
-
-            const sourceText =
-                document.createElement(
-                    "div"
-                );
-
-            sourceText.className =
-                "source-text hidden";
-
-            sourceText.textContent =
+            const text =
                 citation.text ||
-                "No source text available.";
+                "";
 
 
-            const expandButton =
+            const item =
                 document.createElement(
-                    "button"
+                    "div"
                 );
 
-            expandButton.className =
-                "source-expand";
-
-            expandButton.type =
-                "button";
-
-            expandButton.textContent =
-                "View source";
+            item.className =
+                "source-item";
 
 
-            expandButton.addEventListener(
-                "click",
-                function (event) {
+            item.innerHTML = `
 
-                    event.stopPropagation();
+                <div class="source-number">
+                    ${index + 1}
+                </div>
 
+                <div class="source-content">
 
-                    const hidden =
-                        sourceText.classList.contains(
-                            "hidden"
-                        );
+                    <div class="source-name">
+                        ${escapeHtml(source)}
+                    </div>
 
-
-                    if (hidden) {
-
-                        sourceText.classList.remove(
-                            "hidden"
-                        );
-
-                        expandButton.textContent =
-                            "Hide source";
-
-                    } else {
-
-                        sourceText.classList.add(
-                            "hidden"
-                        );
-
-                        expandButton.textContent =
-                            "View source";
-
+                    ${
+                        text
+                            ? `
+                                <div class="source-preview">
+                                    ${escapeHtml(
+                                        text.substring(
+                                            0,
+                                            180
+                                        )
+                                    )}${
+                                        text.length > 180
+                                            ? "..."
+                                            : ""
+                                    }
+                                </div>
+                              `
+                            : ""
                     }
 
-                }
-            );
+                </div>
 
-
-            content.appendChild(
-                label
-            );
-
-            content.appendChild(
-                name
-            );
-
-            content.appendChild(
-                description
-            );
-
-            content.appendChild(
-                sourceText
-            );
-
-
-            sourceCard.appendChild(
-                icon
-            );
-
-            sourceCard.appendChild(
-                content
-            );
-
-            sourceCard.appendChild(
-                expandButton
-            );
+            `;
 
 
             sourcesList.appendChild(
-                sourceCard
+                item
             );
 
         }
+    );
+
+
+    sourcesSection.classList.remove(
+        "hidden"
     );
 
 }
 
 
-/* =====================================================
-   LOAD HISTORY
-===================================================== */
+// =========================================================
+// HISTORY
+// =========================================================
 
 async function loadHistory() {
-
-    console.log(
-        "Loading Noxora history..."
-    );
-
-
-    hideElement(
-        errorCard
-    );
-
-    hideElement(
-        answerSection
-    );
-
-    hideElement(
-        sourcesSection
-    );
-
-
-    showElement(
-        historySection
-    );
-
-
-    if (!historyList) {
-
-        return;
-
-    }
-
-
-    historyList.innerHTML = `
-
-        <div class="history-loading">
-
-            <div class="spinner"></div>
-
-            <span>
-                Loading your history...
-            </span>
-
-        </div>
-
-    `;
-
 
     try {
 
         const response =
             await fetch(
-                HISTORY_API_URL,
-                {
-                    method: "GET"
-                }
+                HISTORY_URL
             );
-
-
-        console.log(
-            "History HTTP status:",
-            response.status
-        );
 
 
         if (!response.ok) {
 
             throw new Error(
-                "History request failed with status " +
-                response.status
+                `History request failed: ${response.status}`
             );
 
         }
@@ -1021,113 +863,41 @@ async function loadHistory() {
             await response.json();
 
 
-        console.log(
-            "History API response:",
-            data
-        );
-
-
-        let result =
-            data;
-
-
-        if (data.body) {
-
-            try {
-
-                result =
-                    typeof data.body === "string"
-                        ? JSON.parse(data.body)
-                        : data.body;
-
-            } catch (error) {
-
-                console.error(
-                    "Failed to parse history body:",
-                    error
-                );
-
-            }
-
-        }
-
-
         renderHistory(
-            result.history || []
+            data.history || []
         );
 
 
     } catch (error) {
 
         console.error(
-            "History request error:",
+            "History loading error:",
             error
         );
-
-
-        historyList.innerHTML = `
-
-            <div class="history-error">
-
-                Unable to load history.
-
-                <br>
-
-                ${escapeHtml(
-                    error.message
-                )}
-
-            </div>
-
-        `;
 
     }
 
 }
 
 
-/* =====================================================
-   RENDER HISTORY
-===================================================== */
+// =========================================================
+// RENDER HISTORY
+// =========================================================
 
 function renderHistory(
     history
 ) {
 
-    if (!historyList) {
-
-        return;
-
-    }
-
-
     historyList.innerHTML =
         "";
 
 
-    if (
-        !history ||
-        history.length === 0
-    ) {
+    if (!history.length) {
 
         historyList.innerHTML = `
-
             <div class="history-empty">
-
-                <div class="history-empty-icon">
-                    ◷
-                </div>
-
-                <div class="history-empty-title">
-                    No history yet
-                </div>
-
-                <div class="history-empty-text">
-                    Your questions will appear here.
-                </div>
-
+                No queries yet.
             </div>
-
         `;
 
         return;
@@ -1136,275 +906,50 @@ function renderHistory(
 
 
     history.forEach(
-        function (
-            item
-        ) {
+        (item) => {
 
-            const historyCard =
+            const historyItem =
                 document.createElement(
-                    "div"
+                    "button"
                 );
 
-            historyCard.className =
-                "history-card";
 
+            historyItem.type =
+                "button";
 
-            historyCard.setAttribute(
-                "role",
-                "button"
-            );
+            historyItem.className =
+                "history-item";
 
-            historyCard.setAttribute(
-                "tabindex",
-                "0"
-            );
-
-            historyCard.setAttribute(
-                "aria-label",
-                "Open history entry"
-            );
-
-
-            /* -----------------------------------------
-               TOP ROW
-            ----------------------------------------- */
-
-            const top =
-                document.createElement(
-                    "div"
-                );
-
-            top.className =
-                "history-card-top";
-
-
-            /* -----------------------------------------
-               MODE
-            ----------------------------------------- */
 
             const mode =
-                document.createElement(
-                    "span"
-                );
+                item.mode === "direct"
+                    ? "DIRECT AI"
+                    : "KNOWLEDGE BASE";
 
-
-            const normalizedMode =
-                String(
-                    item.mode ||
-                    "rag"
-                ).toLowerCase();
-
-
-            const isRag =
-                normalizedMode === "rag";
-
-
-            mode.className =
-                isRag
-                    ? "history-mode history-mode-rag"
-                    : "history-mode history-mode-direct";
-
-
-            mode.textContent =
-                isRag
-                    ? "KNOWLEDGE BASE"
-                    : "DIRECT AI";
-
-
-            /* -----------------------------------------
-               DATE
-            ----------------------------------------- */
-
-            const time =
-                document.createElement(
-                    "span"
-                );
-
-            time.className =
-                "history-time";
-
-            time.textContent =
-                formatDate(
-                    item.timestamp
-                );
-
-
-            top.appendChild(
-                mode
-            );
-
-            top.appendChild(
-                time
-            );
-
-
-            /* -----------------------------------------
-               QUESTION
-            ----------------------------------------- */
 
             const question =
-                document.createElement(
-                    "div"
-                );
-
-            question.className =
-                "history-question";
-
-            question.textContent =
                 item.question ||
-                "Unknown question";
+                "Untitled question";
 
 
-            /* -----------------------------------------
-               ANSWER
-            ----------------------------------------- */
+            historyItem.innerHTML = `
 
-            const answer =
-                document.createElement(
-                    "div"
-                );
+                <div class="history-mode">
+                    ${mode}
+                </div>
 
-            answer.className =
-                "history-answer";
+                <div class="history-question">
+                    ${escapeHtml(question)}
+                </div>
 
-            answer.textContent =
-                item.answer ||
-                "No answer";
+            `;
 
 
-            /* -----------------------------------------
-               SOURCE COUNT
-            ----------------------------------------- */
-
-            const meta =
-                document.createElement(
-                    "div"
-                );
-
-            meta.className =
-                "history-meta";
-
-
-            const sourceInfo =
-                document.createElement(
-                    "span"
-                );
-
-            sourceInfo.className =
-                "history-source-info";
-
-
-            if (isRag) {
-
-                const citations =
-                    Array.isArray(
-                        item.citations
-                    )
-                        ? item.citations
-                        : [];
-
-
-                const uniqueSourceNames =
-                    new Set();
-
-
-                citations.forEach(
-                    function (
-                        citation
-                    ) {
-
-                        if (
-                            citation &&
-                            citation.source
-                        ) {
-
-                            uniqueSourceNames.add(
-                                String(
-                                    citation.source
-                                )
-                                    .trim()
-                                    .toLowerCase()
-                            );
-
-                        }
-
-                    }
-                );
-
-
-                const sourceTotal =
-                    uniqueSourceNames.size;
-
-
-                sourceInfo.textContent =
-                    sourceTotal === 1
-                        ? "1 source"
-                        : sourceTotal +
-                          " sources";
-
-            } else {
-
-                sourceInfo.textContent =
-                    "No sources";
-
-            }
-
-
-            /* -----------------------------------------
-               OPEN LABEL
-            ----------------------------------------- */
-
-            const openLabel =
-                document.createElement(
-                    "span"
-                );
-
-            openLabel.className =
-                "history-open";
-
-            openLabel.textContent =
-                "View →";
-
-
-            meta.appendChild(
-                sourceInfo
-            );
-
-            meta.appendChild(
-                openLabel
-            );
-
-
-            /* -----------------------------------------
-               BUILD CARD
-            ----------------------------------------- */
-
-            historyCard.appendChild(
-                top
-            );
-
-            historyCard.appendChild(
-                question
-            );
-
-            historyCard.appendChild(
-                answer
-            );
-
-            historyCard.appendChild(
-                meta
-            );
-
-
-            /* -----------------------------------------
-               CLICK
-            ----------------------------------------- */
-
-            historyCard.addEventListener(
+            historyItem.addEventListener(
                 "click",
-                function () {
+                () => {
 
-                    openHistoryEntry(
+                    restoreHistoryItem(
                         item
                     );
 
@@ -1412,33 +957,8 @@ function renderHistory(
             );
 
 
-            /* -----------------------------------------
-               KEYBOARD
-            ----------------------------------------- */
-
-            historyCard.addEventListener(
-                "keydown",
-                function (event) {
-
-                    if (
-                        event.key === "Enter" ||
-                        event.key === " "
-                    ) {
-
-                        event.preventDefault();
-
-                        openHistoryEntry(
-                            item
-                        );
-
-                    }
-
-                }
-            );
-
-
             historyList.appendChild(
-                historyCard
+                historyItem
             );
 
         }
@@ -1447,415 +967,77 @@ function renderHistory(
 }
 
 
-/* =====================================================
-   OPEN HISTORY ENTRY
-===================================================== */
+// =========================================================
+// RESTORE HISTORY ITEM
+// =========================================================
 
-function openHistoryEntry(
+function restoreHistoryItem(
     item
 ) {
 
-    if (!item) {
-
-        return;
-
-    }
-
-
-    console.log(
-        "Opening history entry:",
-        item
-    );
-
-
-    const question =
-        item.question ||
-        "";
-
-
-    const answer =
-        item.answer ||
-        "No answer available.";
-
-
     const mode =
-        String(
-            item.mode ||
-            "rag"
-        ).toLowerCase();
+        item.mode === "direct"
+            ? "direct"
+            : "rag";
 
-
-    const citations =
-        Array.isArray(
-            item.citations
-        )
-            ? item.citations
-            : [];
-
-
-    /* -----------------------------------------
-       RESTORE QUESTION
-    ----------------------------------------- */
-
-    if (questionInput) {
-
-        questionInput.value =
-            question;
-
-    }
-
-
-    /* -----------------------------------------
-       RESTORE MODE
-    ----------------------------------------- */
 
     setSelectedMode(
         mode
     );
 
 
-    /* -----------------------------------------
-       RESTORE ANSWER
-    ----------------------------------------- */
-
-    if (answerText) {
-
-        answerText.textContent =
-            answer;
-
-    }
+    questionInput.value =
+        item.question || "";
 
 
-    showElement(
-        answerSection
-    );
+    autoResizeTextarea();
+
+    clearInputError();
 
 
-    /* -----------------------------------------
-       RESTORE STATUS
-    ----------------------------------------- */
+    displayAnswer({
 
-    if (cacheStatus) {
+        mode,
 
-        cacheStatus.textContent =
-            mode === "rag"
-                ? "HISTORY · RAG"
-                : "HISTORY · DIRECT";
+        answer:
+            item.answer || "",
 
-
-        cacheStatus.className =
-            mode === "rag"
-                ? "cache-status history-result-rag"
-                : "cache-status history-result-direct";
-
-    }
-
-
-    /* -----------------------------------------
-       RESTORE SOURCES
-    ----------------------------------------- */
-
-    if (mode === "rag") {
-
-        displaySources(
-            citations
-        );
-
-    } else {
-
-        hideElement(
-            sourcesSection
-        );
-
-
-        if (sourcesList) {
-
-            sourcesList.innerHTML =
-                "";
-
-        }
-
-
-        if (sourcesCount) {
-
-            sourcesCount.textContent =
-                "";
-
-        }
-
-    }
-
-
-    /* -----------------------------------------
-       CLOSE HISTORY
-    ----------------------------------------- */
-
-    hideElement(
-        historySection
-    );
-
-
-    /* -----------------------------------------
-       CLEAR ERROR
-    ----------------------------------------- */
-
-    hideElement(
-        errorCard
-    );
-
-
-    /* -----------------------------------------
-       SCROLL TO ANSWER
-    ----------------------------------------- */
-
-    setTimeout(
-        function () {
-
-            if (answerSection) {
-
-                answerSection.scrollIntoView(
-                    {
-                        behavior: "smooth",
-                        block: "start"
-                    }
-                );
-
-            }
-
-        },
-        100
-    );
-
-}
-
-
-/* =====================================================
-   FORMAT DATE
-===================================================== */
-
-function formatDate(
-    timestamp
-) {
-
-    if (!timestamp) {
-
-        return "";
-
-    }
-
-
-    try {
-
-        const date =
-            new Date(
-                timestamp
-            );
-
-
-        if (
-            Number.isNaN(
-                date.getTime()
+        citations:
+            Array.isArray(
+                item.citations
             )
-        ) {
+                ? item.citations
+                : [],
 
-            return timestamp;
+        cache:
+            "history"
 
-        }
+    });
 
 
-        return date.toLocaleString(
-            "en-IN",
-            {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit"
-            }
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+}
+
+
+// =========================================================
+// INITIALIZE
+// =========================================================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        setSelectedMode(
+            "rag"
         );
 
-    } catch (
-        error
-    ) {
+        loadHistory();
 
-        return timestamp;
+        questionInput.focus();
 
     }
-
-}
-
-
-/* =====================================================
-   HTML ESCAPE
-===================================================== */
-
-function escapeHtml(
-    value
-) {
-
-    return String(
-        value === null ||
-        value === undefined
-            ? ""
-            : value
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-
-}
-
-
-/* =====================================================
-   COPY ANSWER
-===================================================== */
-
-if (copyButton) {
-
-    copyButton.addEventListener(
-        "click",
-        async function () {
-
-            try {
-
-                await navigator.clipboard.writeText(
-                    answerText
-                        ? answerText.textContent
-                        : ""
-                );
-
-
-                const originalText =
-                    copyButton.textContent;
-
-
-                copyButton.textContent =
-                    "Copied!";
-
-
-                setTimeout(
-                    function () {
-
-                        copyButton.textContent =
-                            originalText;
-
-                    },
-                    1500
-                );
-
-
-            } catch (
-                error
-            ) {
-
-                console.error(
-                    "Copy failed:",
-                    error
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   ERROR
-===================================================== */
-
-function showError(
-    message
-) {
-
-    if (!errorCard) {
-
-        console.error(
-            message
-        );
-
-        return;
-
-    }
-
-
-    if (errorMessage) {
-
-        errorMessage.textContent =
-            message;
-
-    }
-
-
-    showElement(
-        errorCard
-    );
-
-}
-
-
-/* =====================================================
-   HELPERS
-===================================================== */
-
-function showElement(
-    element
-) {
-
-    if (!element) {
-
-        return;
-
-    }
-
-
-    element.classList.remove(
-        "hidden"
-    );
-
-}
-
-
-function hideElement(
-    element
-) {
-
-    if (!element) {
-
-        return;
-
-    }
-
-
-    element.classList.add(
-        "hidden"
-    );
-
-}
-
-
-/* =====================================================
-   READY
-===================================================== */
-
-console.log(
-    "Noxora JavaScript initialization complete."
 );
