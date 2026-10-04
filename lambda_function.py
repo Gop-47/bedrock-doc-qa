@@ -424,7 +424,7 @@ def query_knowledge_base(
                 KNOWLEDGE_BASE_ID,
 
             retrievalConfiguration={
-                "vectorSearchConfiguration": {
+                "managedSearchConfiguration": {
                     "numberOfResults":
                         MAX_RAG_RESULTS
                 }
