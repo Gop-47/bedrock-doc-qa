@@ -9,14 +9,11 @@ from datetime import datetime, timezone
 from botocore.exceptions import ClientError
 
 
-# ---------------------------------------------------------
+# =========================================================
 # ENVIRONMENT VARIABLES
-# ---------------------------------------------------------
+# =========================================================
 
-AWS_REGION = os.environ.get(
-    "AWS_REGION",
-    "us-east-1"
-)
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 KNOWLEDGE_BASE_ID = os.environ["KNOWLEDGE_BASE_ID"]
 
@@ -28,78 +25,45 @@ REDIS_ENDPOINT = os.environ["REDIS_ENDPOINT"]
 
 
 # ---------------------------------------------------------
-# MODE / COST CONTROL
+# MODE CONTROL
 # ---------------------------------------------------------
 
-DEFAULT_MODE = os.environ.get(
-    "DEFAULT_MODE",
-    "rag"
-).strip().lower()
-
+DEFAULT_MODE = (
+    os.environ.get("DEFAULT_MODE", "rag")
+    .strip()
+    .lower()
+)
 
 DIRECT_AI_ENABLED = (
-    os.environ.get(
-        "DIRECT_AI_ENABLED",
-        "false"
-    ).strip().lower()
+    os.environ.get("DIRECT_AI_ENABLED", "false")
+    .strip()
+    .lower()
     in ("true", "1", "yes", "on")
 )
 
 
-# Safety: only allow known modes.
-
-if DEFAULT_MODE not in (
-    "rag",
-    "direct"
-):
-
+# Only allow valid modes
+if DEFAULT_MODE not in ("rag", "direct"):
     DEFAULT_MODE = "rag"
 
 
-# If Direct AI is disabled,
-# RAG must always be the effective default.
-
-if (
-    DEFAULT_MODE == "direct"
-    and not DIRECT_AI_ENABLED
-):
-
+# Cost protection:
+# Direct AI cannot become the default unless explicitly enabled.
+if DEFAULT_MODE == "direct" and not DIRECT_AI_ENABLED:
     DEFAULT_MODE = "rag"
 
 
 CACHE_TTL = 3600
 
 
-# ---------------------------------------------------------
-# STARTUP LOGGING
-# ---------------------------------------------------------
-
-print(
-    "Noxora configuration:"
-)
-
-print(
-    f"AWS_REGION={AWS_REGION}"
-)
-
-print(
-    f"DEFAULT_MODE={DEFAULT_MODE}"
-)
-
-print(
-    f"DIRECT_AI_ENABLED={DIRECT_AI_ENABLED}"
-)
-
-
-# ---------------------------------------------------------
+# =========================================================
 # AWS CLIENTS
-# ---------------------------------------------------------
+# =========================================================
 
 dynamodb = boto3.resource(
     "dynamodb",
     region_name=AWS_REGION
 )
-
 
 history_table = dynamodb.Table(
     DYNAMODB_TABLE
@@ -126,52 +90,65 @@ bedrock_agent_client = boto3.client(
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CORS RESPONSE
-# ---------------------------------------------------------
+# =========================================================
 
-def cors_response(
-    status_code,
-    body
-):
+def cors_response(status_code, body):
 
     return {
-
-        "statusCode":
-            status_code,
+        "statusCode": status_code,
 
         "headers": {
+            "Access-Control-Allow-Origin": "*",
 
-            "Access-Control-Allow-Origin":
-                "*",
+            "Access-Control-Allow-Headers": (
+                "Content-Type,"
+                "X-Amz-Date,"
+                "Authorization,"
+                "X-Api-Key,"
+                "X-Amz-Security-Token"
+            ),
 
-            "Access-Control-Allow-Headers":
-                (
-                    "Content-Type,"
-                    "X-Amz-Date,"
-                    "Authorization,"
-                    "X-Api-Key,"
-                    "X-Amz-Security-Token"
-                ),
-
-            "Access-Control-Allow-Methods":
+            "Access-Control-Allow-Methods": (
                 "OPTIONS,GET,POST"
+            ),
 
+            "Content-Type": "application/json"
         },
 
-        "body":
-            json.dumps(body)
-
+        "body": json.dumps(body)
     }
 
 
-# ---------------------------------------------------------
-# REDIS CACHE
-# ---------------------------------------------------------
+# =========================================================
+# MODE RESOLUTION
+# =========================================================
 
-def get_cache_key(
-    question: str
-):
+def get_effective_mode(requested_mode):
+
+    requested_mode = (
+        str(requested_mode)
+        .strip()
+        .lower()
+    )
+
+    # Only RAG or Direct AI are allowed
+    if requested_mode not in ("rag", "direct"):
+        requested_mode = DEFAULT_MODE
+
+    # Direct AI is disabled at Lambda level
+    if requested_mode == "direct" and not DIRECT_AI_ENABLED:
+        return "rag"
+
+    return requested_mode
+
+
+# =========================================================
+# REDIS CACHE
+# =========================================================
+
+def get_cache_key(question, mode):
 
     normalized_question = (
         question
@@ -179,36 +156,25 @@ def get_cache_key(
         .lower()
     )
 
-
     question_hash = hashlib.sha256(
-        normalized_question.encode(
-            "utf-8"
-        )
+        normalized_question.encode("utf-8")
     ).hexdigest()
 
-
-    return (
-        f"qa:{question_hash}"
-    )
+    return f"qa:{mode}:{question_hash}"
 
 
-def get_cached_answer(
-    question: str
-):
+def get_cached_answer(question, mode):
 
     try:
 
         cache_key = get_cache_key(
-            question
+            question,
+            mode
         )
 
-
-        cached_data = (
-            redis_client.get(
-                cache_key
-            )
+        cached_data = redis_client.get(
+            cache_key
         )
-
 
         if cached_data:
 
@@ -216,9 +182,7 @@ def get_cached_answer(
                 cached_data
             )
 
-
         return None
-
 
     except Exception as e:
 
@@ -230,16 +194,17 @@ def get_cached_answer(
 
 
 def cache_answer(
-    question: str,
-    result: dict
+    question,
+    mode,
+    result
 ):
 
     try:
 
         cache_key = get_cache_key(
-            question
+            question,
+            mode
         )
-
 
         redis_client.set(
             cache_key,
@@ -247,11 +212,9 @@ def cache_answer(
             ex=CACHE_TTL
         )
 
-
         print(
             f"Cached answer with key: {cache_key}"
         )
-
 
     except Exception as e:
 
@@ -260,68 +223,46 @@ def cache_answer(
         )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # BEDROCK RAG
-# ---------------------------------------------------------
+# =========================================================
 
-def query_knowledge_base(
-    question: str
-):
+def query_knowledge_base(question):
 
     try:
 
         # -------------------------------------------------
-        # CHECK REDIS
+        # CHECK CACHE
         # -------------------------------------------------
 
-        cached_result = (
-            get_cached_answer(
-                question
-            )
+        cached_result = get_cached_answer(
+            question,
+            "rag"
         )
-
 
         if cached_result:
 
-            print(
-                "CACHE HIT"
-            )
+            print("RAG CACHE HIT")
 
-
-            cached_result["cache"] = (
-                "hit"
-            )
-
-
-            cached_result["mode"] = (
-                "rag"
-            )
-
+            cached_result["cache"] = "hit"
 
             return cached_result
 
 
-        print(
-            "CACHE MISS"
-        )
+        print("RAG CACHE MISS")
 
 
         # -------------------------------------------------
         # KNOWLEDGE BASE RETRIEVAL
         # -------------------------------------------------
 
-        response = (
-            bedrock_agent_client.retrieve(
+        response = bedrock_agent_client.retrieve(
 
-                knowledgeBaseId=
-                    KNOWLEDGE_BASE_ID,
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
 
-                retrievalQuery={
-                    "text":
-                        question
-                }
-
-            )
+            retrievalQuery={
+                "text": question
+            }
         )
 
 
@@ -335,43 +276,25 @@ def query_knowledge_base(
 
             text = (
                 result
-                .get(
-                    "content",
-                    {}
-                )
-                .get(
-                    "text",
-                    ""
-                )
+                .get("content", {})
+                .get("text", "")
             )
 
 
             source = (
                 result
-                .get(
-                    "location",
-                    {}
-                )
-                .get(
-                    "s3Location",
-                    {}
-                )
-                .get(
-                    "uri",
-                    "Unknown"
-                )
+                .get("location", {})
+                .get("s3Location", {})
+                .get("uri", "Unknown")
             )
 
 
-            contexts.append({
-
-                "text":
-                    text,
-
-                "source":
-                    source
-
-            })
+            contexts.append(
+                {
+                    "text": text,
+                    "source": source
+                }
+            )
 
 
         # -------------------------------------------------
@@ -379,12 +302,10 @@ def query_knowledge_base(
         # -------------------------------------------------
 
         context_text = "\n\n".join(
-
             [
                 context["text"]
                 for context in contexts
             ]
-
         )
 
 
@@ -395,7 +316,8 @@ def query_knowledge_base(
         prompt = f"""
 Use the following context from documents to answer the question.
 
-If the answer is not in the context say:
+If the answer is not in the context, say:
+
 "I cannot find this in the provided documents."
 
 Context:
@@ -403,6 +325,7 @@ Context:
 {context_text}
 
 Question:
+
 {question}
 
 Answer:
@@ -414,26 +337,16 @@ Answer:
             "anthropic_version":
                 "bedrock-2023-05-31",
 
-            "max_tokens":
-                1000,
+            "max_tokens": 1000,
 
-            "temperature":
-                0.7,
+            "temperature": 0.7,
 
             "messages": [
-
                 {
-
-                    "role":
-                        "user",
-
-                    "content":
-                        prompt
-
+                    "role": "user",
+                    "content": prompt
                 }
-
             ]
-
         }
 
 
@@ -444,63 +357,48 @@ Answer:
         response_claude = (
             bedrock_client.invoke_model(
 
-                modelId=
-                    MODEL_ID,
+                modelId=MODEL_ID,
 
-                contentType=
-                    "application/json",
+                contentType="application/json",
 
-                accept=
-                    "application/json",
+                accept="application/json",
 
-                body=
-                    json.dumps(
-                        request_body
-                    )
-
+                body=json.dumps(
+                    request_body
+                )
             )
         )
 
 
         response_body = json.loads(
-
-            response_claude[
-                "body"
-            ].read()
-
+            response_claude["body"].read()
         )
 
 
         answer = (
-            response_body[
-                "content"
-            ][0]["text"]
+            response_body
+            ["content"][0]
+            ["text"]
         )
 
 
         result = {
 
-            "answer":
-                answer,
+            "answer": answer,
 
-            "citations":
-                contexts,
+            "citations": contexts,
 
-            "cache":
-                "miss",
-
-            "mode":
-                "rag"
-
+            "cache": "miss"
         }
 
 
         # -------------------------------------------------
-        # SAVE TO REDIS
+        # SAVE CACHE
         # -------------------------------------------------
 
         cache_answer(
             question,
+            "rag",
             result
         )
 
@@ -511,14 +409,10 @@ Answer:
     except ClientError as e:
 
         error_code = (
-            e.response[
-                "Error"
-            ]["Code"]
+            e.response["Error"]["Code"]
         )
 
-
         error_message = str(e)
-
 
         print(
             f"Bedrock error: "
@@ -529,22 +423,15 @@ Answer:
 
         return {
 
-            "answer":
-                (
-                    f"Error: "
-                    f"{error_code} - "
-                    f"{error_message}"
-                ),
+            "answer": (
+                f"Error: "
+                f"{error_code} - "
+                f"{error_message}"
+            ),
 
-            "citations":
-                [],
+            "citations": [],
 
-            "cache":
-                "error",
-
-            "mode":
-                "rag"
-
+            "cache": "error"
         }
 
 
@@ -558,54 +445,58 @@ Answer:
 
         return {
 
-            "answer":
-                f"Error: {str(e)}",
+            "answer": (
+                f"Error: {str(e)}"
+            ),
 
-            "citations":
-                [],
+            "citations": [],
 
-            "cache":
-                "error",
-
-            "mode":
-                "rag"
-
+            "cache": "error"
         }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # DIRECT CLAUDE
-# ---------------------------------------------------------
+# =========================================================
 
-def query_claude_directly(
-    question: str
-):
+def query_claude_directly(question):
+
+    # -----------------------------------------------------
+    # CHECK CACHE
+    # -----------------------------------------------------
+
+    cached_result = get_cached_answer(
+        question,
+        "direct"
+    )
+
+    if cached_result:
+
+        print("DIRECT AI CACHE HIT")
+
+        cached_result["cache"] = "hit"
+
+        return cached_result
+
+
+    print("DIRECT AI CACHE MISS")
+
 
     request_body = {
 
         "anthropic_version":
             "bedrock-2023-05-31",
 
-        "max_tokens":
-            1000,
+        "max_tokens": 1000,
 
-        "temperature":
-            0.7,
+        "temperature": 0.7,
 
         "messages": [
-
             {
-
-                "role":
-                    "user",
-
-                "content":
-                    question
-
+                "role": "user",
+                "content": question
             }
-
         ]
-
     }
 
 
@@ -614,59 +505,88 @@ def query_claude_directly(
         response = (
             bedrock_client.invoke_model(
 
-                modelId=
-                    MODEL_ID,
+                modelId=MODEL_ID,
 
-                contentType=
-                    "application/json",
+                contentType="application/json",
 
-                accept=
-                    "application/json",
+                accept="application/json",
 
-                body=
-                    json.dumps(
-                        request_body
-                    )
-
+                body=json.dumps(
+                    request_body
+                )
             )
         )
 
 
         response_body = json.loads(
-
-            response[
-                "body"
-            ].read()
-
+            response["body"].read()
         )
 
 
-        return (
-            response_body[
-                "content"
-            ][0]["text"]
+        answer = (
+            response_body
+            ["content"][0]
+            ["text"]
         )
+
+
+        result = {
+
+            "answer": answer,
+
+            "citations": [],
+
+            "cache": "miss"
+        }
+
+
+        # -------------------------------------------------
+        # SAVE DIRECT AI CACHE
+        # -------------------------------------------------
+
+        cache_answer(
+            question,
+            "direct",
+            result
+        )
+
+
+        return result
 
 
     except ClientError as e:
 
-        return (
-            f"Error calling Claude: "
-            f"{str(e)}"
-        )
+        return {
+
+            "answer": (
+                "Error calling Claude: "
+                f"{str(e)}"
+            ),
+
+            "citations": [],
+
+            "cache": "error"
+        }
 
 
     except Exception as e:
 
-        return (
-            f"Error calling Claude: "
-            f"{str(e)}"
-        )
+        return {
+
+            "answer": (
+                "Error calling Claude: "
+                f"{str(e)}"
+            ),
+
+            "citations": [],
+
+            "cache": "error"
+        }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # DYNAMODB QUERY HISTORY
-# ---------------------------------------------------------
+# =========================================================
 
 def save_query_history(
     question,
@@ -679,34 +599,24 @@ def save_query_history(
 
         Item={
 
-            "query_id":
-                str(
-                    uuid.uuid4()
-                ),
+            "query_id": str(
+                uuid.uuid4()
+            ),
 
-            "timestamp":
-                (
-                    datetime
-                    .now(
-                        timezone.utc
-                    )
-                    .isoformat()
-                ),
+            "timestamp": (
+                datetime
+                .now(timezone.utc)
+                .isoformat()
+            ),
 
-            "question":
-                question,
+            "question": question,
 
-            "answer":
-                answer,
+            "answer": answer,
 
-            "mode":
-                mode,
+            "mode": mode,
 
-            "citations":
-                citations
-
+            "citations": citations
         }
-
     )
 
 
@@ -719,10 +629,8 @@ def get_query_history():
         )
 
 
-        response = (
-            history_table.scan(
-                Limit=20
-            )
+        response = history_table.scan(
+            Limit=20
         )
 
 
@@ -733,22 +641,19 @@ def get_query_history():
 
 
         # Newest first
-
         items.sort(
 
-            key=lambda x:
-                x.get(
-                    "timestamp",
-                    ""
-                ),
+            key=lambda x: x.get(
+                "timestamp",
+                ""
+            ),
 
             reverse=True
-
         )
 
 
         print(
-            "History records found: "
+            f"History records found: "
             f"{len(items)}"
         )
 
@@ -758,27 +663,22 @@ def get_query_history():
             200,
 
             {
-                "history":
-                    items
+                "history": items
             }
-
         )
 
 
     except ClientError as e:
 
         error_code = (
-            e.response[
-                "Error"
-            ]["Code"]
+            e.response["Error"]["Code"]
         )
-
 
         error_message = str(e)
 
 
         print(
-            "DynamoDB history error: "
+            f"DynamoDB history error: "
             f"{error_code} - "
             f"{error_message}"
         )
@@ -789,10 +689,8 @@ def get_query_history():
             500,
 
             {
-                "error":
-                    error_message
+                "error": error_message
             }
-
         )
 
 
@@ -808,74 +706,18 @@ def get_query_history():
             500,
 
             {
-                "error":
-                    str(e)
+                "error": str(e)
             }
-
         )
 
 
-# ---------------------------------------------------------
-# DETERMINE EFFECTIVE MODE
-# ---------------------------------------------------------
-
-def get_effective_mode(
-    requested_mode
-):
-
-    requested_mode = (
-        str(
-            requested_mode or ""
-        )
-        .strip()
-        .lower()
-    )
-
-
-    # Unknown mode -> default
-
-    if requested_mode not in (
-        "rag",
-        "direct"
-    ):
-
-        requested_mode = (
-            DEFAULT_MODE
-        )
-
-
-    # Direct AI disabled -> force RAG
-
-    if (
-        requested_mode == "direct"
-        and not DIRECT_AI_ENABLED
-    ):
-
-        print(
-            "Direct AI requested but disabled. "
-            "Forcing RAG mode."
-        )
-
-
-        return "rag"
-
-
-    return requested_mode
-
-
-# ---------------------------------------------------------
+# =========================================================
 # LAMBDA HANDLER
-# ---------------------------------------------------------
+# =========================================================
 
-def lambda_handler(
-    event,
-    context
-):
+def lambda_handler(event, context):
 
-    print(
-        "Received event:"
-    )
-
+    print("Received event:")
 
     print(
         json.dumps(
@@ -885,15 +727,11 @@ def lambda_handler(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # OPTIONS / CORS
-    # -----------------------------------------------------
+    # =====================================================
 
-    if (
-        event.get(
-            "httpMethod"
-        ) == "OPTIONS"
-    ):
+    if event.get("httpMethod") == "OPTIONS":
 
         return cors_response(
 
@@ -903,26 +741,21 @@ def lambda_handler(
                 "message":
                     "CORS preflight successful"
             }
-
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # GET /query/history
-    # -----------------------------------------------------
+    # =====================================================
 
-    if (
-        event.get(
-            "httpMethod"
-        ) == "GET"
-    ):
+    if event.get("httpMethod") == "GET":
 
         return get_query_history()
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # PROCESS REQUEST BODY
-    # -----------------------------------------------------
+    # =====================================================
 
     if (
         "body" in event
@@ -932,17 +765,11 @@ def lambda_handler(
         body = event["body"]
 
 
-        if isinstance(
-            body,
-            str
-        ):
+        if isinstance(body, str):
 
             try:
 
-                body = json.loads(
-                    body
-                )
-
+                body = json.loads(body)
 
             except json.JSONDecodeError:
 
@@ -951,10 +778,12 @@ def lambda_handler(
                     400,
 
                     {
-                        "error":
-                            "Invalid JSON body"
+                        "error": {
+                            "type": "INVALID_JSON",
+                            "message":
+                                "Please send a valid JSON request."
+                        }
                     }
-
                 )
 
 
@@ -963,186 +792,167 @@ def lambda_handler(
             event = body
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # QUESTION VALIDATION
-    # -----------------------------------------------------
+    # =====================================================
 
-    if (
-        "question"
-        not in event
-    ):
+    if "question" not in event:
 
         return cors_response(
 
             400,
 
             {
-                "error":
-                    "Missing required field: question"
+                "error": {
+                    "type": "QUESTION_REQUIRED",
+                    "message":
+                        "Please enter a question before asking Noxora."
+                }
             }
-
         )
 
 
-question = event["question"]
+    question = event["question"]
 
 
-    if not isinstance(
-        question,
-        str
-    ):
+    # -----------------------------------------------------
+    # TYPE VALIDATION
+    # -----------------------------------------------------
+
+    if not isinstance(question, str):
 
         return cors_response(
 
             400,
 
             {
-                "error":
-                    "Question must be a string"
+                "error": {
+                    "type": "INVALID_QUESTION",
+                    "message":
+                        "Your question must be text."
+                }
             }
-
         )
 
 
-    if not question.strip():
+    # -----------------------------------------------------
+    # EMPTY / WHITESPACE VALIDATION
+    # -----------------------------------------------------
+
+    question = question.strip()
+
+
+    if not question:
 
         return cors_response(
 
             400,
 
             {
-                "error":
-                    "Question cannot be empty"
+                "error": {
+                    "type": "EMPTY_QUESTION",
+                    "message":
+                        "Please enter a question before asking Noxora."
+                }
             }
-
         )
 
 
-    # -----------------------------------------------------
-    # REQUESTED MODE
-    # -----------------------------------------------------
+    # =====================================================
+    # MODE
+    # =====================================================
 
-    requested_mode = (
-        event.get(
-            "mode",
-            DEFAULT_MODE
-        )
+    requested_mode = event.get(
+        "mode",
+        DEFAULT_MODE
     )
 
 
-    # -----------------------------------------------------
-    # EFFECTIVE MODE
-    # -----------------------------------------------------
-
-    mode = get_effective_mode(
+    effective_mode = get_effective_mode(
         requested_mode
     )
 
 
     print(
-        f"Requested mode: "
-        f"{requested_mode}"
+        f"Requested mode: {requested_mode}"
     )
-
 
     print(
-        f"Effective mode: "
-        f"{mode}"
+        f"Effective mode: {effective_mode}"
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # RAG MODE
-    # -----------------------------------------------------
+    # =====================================================
 
-    if mode == "rag":
+    if effective_mode == "rag":
 
-        result = (
-            query_knowledge_base(
-                question
-            )
+        result = query_knowledge_base(
+            question
         )
 
 
         save_query_history(
 
-            question=
-                question,
+            question=question,
 
-            answer=
-                result["answer"],
+            answer=result["answer"],
 
-            mode=
-                "rag",
+            mode="rag",
 
-            citations=
-                result.get(
+            citations=result.get(
+                "citations",
+                []
+            )
+        )
+
+
+        return cors_response(
+
+            200,
+
+            {
+
+                "question": question,
+
+                "mode": "rag",
+
+                "answer": result["answer"],
+
+                "citations": result.get(
                     "citations",
                     []
+                ),
+
+                "cache": result.get(
+                    "cache",
+                    "unknown"
                 )
-
-        )
-
-
-        return cors_response(
-
-            200,
-
-            {
-
-                "question":
-                    question,
-
-                "mode":
-                    "rag",
-
-                "answer":
-                    result["answer"],
-
-                "citations":
-                    result.get(
-                        "citations",
-                        []
-                    ),
-
-                "cache":
-                    result.get(
-                        "cache",
-                        "unknown"
-                    )
-
             }
-
         )
 
 
-    # -----------------------------------------------------
-    # DIRECT MODE
-    # -----------------------------------------------------
+    # =====================================================
+    # DIRECT AI MODE
+    # =====================================================
 
-    if mode == "direct":
+    if effective_mode == "direct":
 
-        answer = (
-            query_claude_directly(
-                question
-            )
+        result = query_claude_directly(
+            question
         )
 
 
         save_query_history(
 
-            question=
-                question,
+            question=question,
 
-            answer=
-                answer,
+            answer=result["answer"],
 
-            mode=
-                "direct",
+            mode="direct",
 
-            citations=
-                []
-
+            citations=[]
         )
 
 
@@ -1152,37 +962,35 @@ question = event["question"]
 
             {
 
-                "question":
-                    question,
+                "question": question,
 
-                "mode":
-                    "direct",
+                "mode": "direct",
 
-                "answer":
-                    answer,
+                "answer": result["answer"],
 
-                "citations":
-                    [],
+                "citations": [],
 
-                "cache":
-                    "not_used"
-
+                "cache": result.get(
+                    "cache",
+                    "unknown"
+                )
             }
-
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # FALLBACK
-    # -----------------------------------------------------
+    # =====================================================
 
     return cors_response(
 
         500,
 
         {
-            "error":
-                "Unable to determine request mode"
+            "error": {
+                "type": "INVALID_MODE",
+                "message":
+                    "Unable to determine the AI response mode."
+            }
         }
-
     )
