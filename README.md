@@ -48,9 +48,9 @@ It also supports a **Direct AI mode** for general-purpose questions without docu
                                     │
                                     ▼
                     ┌─────────────────────────────┐
-                    │        AWS Lambda            │
-                    │       Python 3.12             │
-                    │         Docker                │
+                    │        AWS Lambda           │
+                    │       Python 3.12           │
+                    │         Docker              │
                     └──────┬──────┬──────┬────────┘
                            │      │      │
              ┌─────────────┘      │      └──────────────┐
@@ -864,7 +864,7 @@ The project combines **Generative AI, AWS Cloud, backend engineering, DevOps, an
 
 Senior Software Engineer
 
-`.NET` · `Node.js` · `AWS` · `Microservices` · `Generative AI` · `RAG`
+`.NET` · `Node.js` · `AWS` · `DevOps` · `Microservices` · `Generative AI` · `RAG`
 
 ---
 
