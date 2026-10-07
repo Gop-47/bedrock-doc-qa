@@ -94,6 +94,10 @@ jobs:
 
     steps:
 
+      # -------------------------------------------------
+      # Checkout
+      # -------------------------------------------------
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -105,7 +109,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::917301404773:role/github-actions-bedrock-doc-qa
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
       # -------------------------------------------------
       # Verify AWS identity
@@ -133,7 +137,7 @@ jobs:
             .
 
       # -------------------------------------------------
-      # Push Docker image
+      # Push Docker image to ECR
       # -------------------------------------------------
 
       - name: Push Docker image to ECR
@@ -150,7 +154,7 @@ jobs:
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
             --image-uri ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }} \
-            --region ${{ env.AWS_REGION }}
+            --region us-east-1
 
       # -------------------------------------------------
       # Wait for Lambda update
@@ -160,7 +164,7 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
-            --region ${{ env.AWS_REGION }}
+            --region us-east-1
 
       # -------------------------------------------------
       # Post deployment health check
