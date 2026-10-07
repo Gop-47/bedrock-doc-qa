@@ -223,11 +223,7 @@ jobs:
       - docker-build
       - deploy
 
-    if: always() && (
-      needs.test.result == 'failure' ||
-      needs.docker-build.result == 'failure' ||
-      needs.deploy.result == 'failure'
-    )
+    if: ${{ always() && (needs.test.result == 'failure' || needs.docker-build.result == 'failure' || needs.deploy.result == 'failure') }}
 
     steps:
 
@@ -239,34 +235,42 @@ jobs:
           echo "======================================"
 
           echo ""
+
           echo "Repository:"
           echo "${{ github.repository }}"
 
           echo ""
+
           echo "Branch:"
           echo "${{ github.ref_name }}"
 
           echo ""
+
           echo "Commit:"
           echo "${{ github.sha }}"
 
           echo ""
+
           echo "Triggered by:"
           echo "${{ github.actor }}"
 
           echo ""
+
           echo "Test result:"
           echo "${{ needs.test.result }}"
 
           echo ""
+
           echo "Docker build result:"
           echo "${{ needs.docker-build.result }}"
 
           echo ""
+
           echo "Deployment result:"
           echo "${{ needs.deploy.result }}"
 
           echo ""
+
           echo "Deployment was NOT completed successfully."
 
           exit 1
@@ -285,7 +289,7 @@ jobs:
       - docker-build
       - deploy
 
-    if: needs.deploy.result == 'success'
+    if: ${{ needs.deploy.result == 'success' }}
 
     steps:
 
@@ -297,18 +301,22 @@ jobs:
           echo "======================================"
 
           echo ""
+
           echo "Repository:"
           echo "${{ github.repository }}"
 
           echo ""
+
           echo "Branch:"
           echo "${{ github.ref_name }}"
 
           echo ""
+
           echo "Commit:"
           echo "${{ github.sha }}"
 
           echo ""
+
           echo "Tests: PASSED"
           echo "Syntax Check: PASSED"
           echo "Docker Build: PASSED"
@@ -317,4 +325,5 @@ jobs:
           echo "Health Check: PASSED"
 
           echo ""
+
           echo "Noxora deployment completed successfully."
